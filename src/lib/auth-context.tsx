@@ -133,6 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const attemptsRes = await fetch(`/api/attempts?studentId=${user.id}`);
             const attemptsData = await attemptsRes.json();
             setAttempts(attemptsData.attempts || []);
+          } else if (user.role === 'teacher') {
+            const attemptsRes = await fetch(`/api/attempts?teacherId=${user.id}`);
+            const attemptsData = await attemptsRes.json();
+            setAttempts(attemptsData.attempts || []);
           }
         } catch (error) {
           console.error('Data hydration error:', error);

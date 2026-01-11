@@ -20,6 +20,9 @@ import {
   Users,
   Target,
 } from 'lucide-react';
+import { usePagination } from '@/hooks/use-pagination';
+import { PaginationControls } from '@/components/ui/pagination-controls';
+import { useResponsivePageSize } from '@/lib/calculate-page-size';
 
 export default function StudentClassesPage() {
   const { user, getStudentClasses, quizzes, attempts, joinClass } = useAuth();
@@ -41,6 +44,23 @@ export default function StudentClassesPage() {
       });
     }
   };
+
+  // Responsive page size for expanded layout (larger cards with nested content)
+  const defaultPageSize = useResponsivePageSize('expanded');
+
+  // Pagination
+  const {
+    paginatedItems,
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage,
+    setCurrentPage,
+    setItemsPerPage,
+  } = usePagination(studentClasses, {
+    defaultItemsPerPage: defaultPageSize,
+    persistInUrl: true,
+  });
 
   return (
     <div className="space-y-6">
@@ -92,105 +112,117 @@ export default function StudentClassesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {studentClasses.map((cls) => {
-            const classQuizzes = quizzes.filter(q => q.classId === cls.id && q.isPublished);
-            const completedInClass = classQuizzes.filter(q => completedQuizIds.has(q.id)).length;
-            const progress = classQuizzes.length > 0 
-              ? Math.round((completedInClass / classQuizzes.length) * 100) 
-              : 0;
+        <>
+          <div className="space-y-6">
+            {paginatedItems.map((cls) => {
+              const classQuizzes = quizzes.filter(q => q.classId === cls.id && q.isPublished);
+              const completedInClass = classQuizzes.filter(q => completedQuizIds.has(q.id)).length;
+              const progress = classQuizzes.length > 0 
+                ? Math.round((completedInClass / classQuizzes.length) * 100) 
+                : 0;
 
-            return (
-              <Card key={cls.id} className="border-0 shadow-lg shadow-slate-200/50">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{cls.name}</CardTitle>
-                      <CardDescription>{cls.description}</CardDescription>
+              return (
+                <Card key={cls.id} className="border-0 shadow-lg shadow-slate-200/50">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle>{cls.name}</CardTitle>
+                        <CardDescription>{cls.description}</CardDescription>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-violet-600">{progress}%</div>
+                        <p className="text-xs text-slate-500">Complete</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-violet-600">{progress}%</div>
-                      <p className="text-xs text-slate-500">Complete</p>
-                    </div>
-                  </div>
-                  <Progress value={progress} className="h-2 mt-4" />
-                </CardHeader>
-                <CardContent>
-                  <h4 className="font-medium text-slate-900 mb-4">Available Quizzes</h4>
-                  {classQuizzes.length === 0 ? (
-                    <p className="text-slate-500 text-sm">No quizzes available yet</p>
-                  ) : (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {classQuizzes.map((quiz) => {
-                        const quizAttempts = myAttempts.filter(a => a.quizId === quiz.id);
-                        const bestAttempt = quizAttempts.sort((a, b) => b.accuracy - a.accuracy)[0];
-                        const canRetry = quizAttempts.length < quiz.maxAttempts;
-                        const hasAttempted = quizAttempts.length > 0;
+                    <Progress value={progress} className="h-2 mt-4" />
+                  </CardHeader>
+                  <CardContent>
+                    <h4 className="font-medium text-slate-900 mb-4">Available Quizzes</h4>
+                    {classQuizzes.length === 0 ? (
+                      <p className="text-slate-500 text-sm">No quizzes available yet</p>
+                    ) : (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {classQuizzes.map((quiz) => {
+                          const quizAttempts = myAttempts.filter(a => a.quizId === quiz.id);
+                          const bestAttempt = quizAttempts.sort((a, b) => b.accuracy - a.accuracy)[0];
+                          const canRetry = quizAttempts.length < quiz.maxAttempts;
+                          const hasAttempted = quizAttempts.length > 0;
 
-                        return (
-                          <div 
-                            key={quiz.id} 
-                            className={`p-4 rounded-xl border ${
-                              hasAttempted ? 'bg-slate-50 border-slate-200' : 'border-violet-200 bg-violet-50/50'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <h5 className="font-medium text-slate-900">{quiz.title}</h5>
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {quiz.difficulty.replace('_', ' ')}
-                              </Badge>
-                            </div>
-                            
-                            <div className="flex items-center gap-4 text-sm text-slate-600 mb-3">
-                              <span className="flex items-center gap-1">
-                                <FileQuestion className="w-3.5 h-3.5" />
-                                {quiz.questionCount ?? 0}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5" />
-                                {Math.floor(quiz.timeLimit / 60)}m
-                              </span>
-                              {quiz.deadline && (
-                                <span className="flex items-center gap-1 text-amber-600">
-                                  <Calendar className="w-3.5 h-3.5" />
-                                  {new Date(quiz.deadline).toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
-
-                            {hasAttempted && bestAttempt && (
-                              <div className="flex items-center gap-2 mb-3 text-sm">
-                                <Target className="w-4 h-4 text-emerald-600" />
-                                <span className="text-slate-600">
-                                  Best: <span className="font-medium text-slate-900">{bestAttempt.accuracy}%</span>
-                                </span>
-                                <Badge variant="secondary" className="text-xs">
-                                  {quizAttempts.length}/{quiz.maxAttempts} attempts
+                          return (
+                            <div 
+                              key={quiz.id} 
+                              className={`p-4 rounded-xl border ${
+                                hasAttempted ? 'bg-slate-50 border-slate-200' : 'border-violet-200 bg-violet-50/50'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <h5 className="font-medium text-slate-900">{quiz.title}</h5>
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  {quiz.difficulty.replace('_', ' ')}
                                 </Badge>
                               </div>
-                            )}
+                              
+                              <div className="flex items-center gap-4 text-sm text-slate-600 mb-3">
+                                <span className="flex items-center gap-1">
+                                  <FileQuestion className="w-3.5 h-3.5" />
+                                  {quiz.questionCount ?? 0}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  {Math.floor(quiz.timeLimit / 60)}m
+                                </span>
+                                {quiz.deadline && (
+                                  <span className="flex items-center gap-1 text-amber-600">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    {new Date(quiz.deadline).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
 
-                            <Link href={`/student/quiz/${quiz.id}`}>
-                              <Button 
-                                size="sm" 
-                                className="w-full gap-2"
-                                variant={hasAttempted ? "outline" : "default"}
-                                disabled={!canRetry}
-                              >
-                                <Play className="w-3.5 h-3.5" />
-                                {hasAttempted ? (canRetry ? 'Retry' : 'Max Attempts') : 'Start Quiz'}
-                              </Button>
-                            </Link>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                              {hasAttempted && bestAttempt && (
+                                <div className="flex items-center gap-2 mb-3 text-sm">
+                                  <Target className="w-4 h-4 text-emerald-600" />
+                                  <span className="text-slate-600">
+                                    Best: <span className="font-medium text-slate-900">{bestAttempt.accuracy}%</span>
+                                  </span>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {quizAttempts.length}/{quiz.maxAttempts} attempts
+                                  </Badge>
+                                </div>
+                              )}
+
+                              <Link href={`/student/quiz/${quiz.id}`}>
+                                <Button 
+                                  size="sm" 
+                                  className="w-full gap-2"
+                                  variant={hasAttempted ? "outline" : "default"}
+                                  disabled={!canRetry}
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                  {hasAttempted ? (canRetry ? 'Retry' : 'Max Attempts') : 'Start Quiz'}
+                                </Button>
+                              </Link>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+            pageSizeOptions={[3, 6, 9, 12]}
+          />
+        </>
       )}
     </div>
   );

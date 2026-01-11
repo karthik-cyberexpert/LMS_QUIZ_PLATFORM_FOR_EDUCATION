@@ -62,6 +62,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('studentId');
     const quizId = searchParams.get('quizId');
+    const teacherId = searchParams.get('teacherId');
 
     let sql = `
       SELECT a.*, u.name as studentName 
@@ -79,6 +80,10 @@ export async function GET(request: Request) {
     } else if (quizId) {
       sql += ' WHERE a.quizId = ?';
       params.push(quizId);
+    } else if (teacherId) {
+      // Fetch all attempts for this teacher's quizzes
+      sql += ' WHERE a.quizId IN (SELECT id FROM quizzes WHERE teacherId = ?)';
+      params.push(teacherId);
     }
 
     sql += ' ORDER BY a.startedAt DESC';
