@@ -30,8 +30,8 @@ export default function StudentClassesPage() {
   const myAttempts = attempts.filter(a => a.studentId === user?.id);
   const completedQuizIds = new Set(myAttempts.map(a => a.quizId));
 
-  const handleJoinClass = () => {
-    if (joinClass(inviteCode.toUpperCase())) {
+  const handleJoinClass = async () => {
+    if (await joinClass(inviteCode.toUpperCase())) {
       toast.success('Class joined successfully!');
       setInviteCode('');
       setJoinDialogOpen(false);
@@ -144,7 +144,7 @@ export default function StudentClassesPage() {
                             <div className="flex items-center gap-4 text-sm text-slate-600 mb-3">
                               <span className="flex items-center gap-1">
                                 <FileQuestion className="w-3.5 h-3.5" />
-                                {quiz.questions.length}
+                                {quiz.questionCount ?? 0}
                               </span>
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3.5 h-3.5" />

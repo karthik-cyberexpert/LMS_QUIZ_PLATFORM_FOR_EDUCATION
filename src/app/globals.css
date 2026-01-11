@@ -43,9 +43,9 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --animate-gradient: gradient-shift 4s ease infinite;
-  --animate-float: float 2s ease-in-out infinite;
-  --animate-pulse-glow: pulse-glow 1.5s ease-in-out infinite;
+  --animate-gradient: gradient-shift 8s ease infinite;
+  --animate-float: float 4s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 3s ease-in-out infinite;
 
   @keyframes gradient-shift {
     0%, 100% { background-position: 0% 50%; }
@@ -140,11 +140,6 @@
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-outfit), sans-serif;
   }
-  
-  /* Make all transitions snappier */
-  * {
-    transition-duration: 100ms !important;
-  }
 }
 
 .font-outfit {
@@ -169,11 +164,11 @@
 }
 
 .glass-card {
-  @apply bg-white/70 backdrop-blur-xl border border-white/30 shadow-xl;
+  @apply bg-white/70 backdrop-blur-lg border border-white/30 shadow-xl;
 }
 
 .dark .glass-card {
-  @apply bg-slate-900/60 backdrop-blur-xl border border-white/5 shadow-xl;
+  @apply bg-slate-900/60 backdrop-blur-lg border border-white/5 shadow-xl;
 }
 
 .glass-morphism {

@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { calculateLeaderboard } from '@/lib/mock-data';
-import { MOCK_STUDENTS } from '@/lib/mock-data';
+import { User } from '@/lib/types';
+import { useEffect } from 'react';
 import {
   Trophy,
   Medal,
@@ -21,12 +22,19 @@ import {
 } from 'lucide-react';
 
 export default function LeaderboardPage() {
-  const { user, getStudentClasses, quizzes, attempts } = useAuth();
+  const { user, getStudentClasses, quizzes, attempts, getClassStudents } = useAuth();
   const studentClasses = getStudentClasses();
   const [selectedClass, setSelectedClass] = useState(studentClasses[0]?.id || '');
+  const [classStudents, setClassStudents] = useState<User[]>([]);
+
+  useEffect(() => {
+    if (selectedClass) {
+      getClassStudents(selectedClass).then(setClassStudents);
+    }
+  }, [selectedClass, getClassStudents]);
 
   const leaderboard = selectedClass 
-    ? calculateLeaderboard(selectedClass, MOCK_STUDENTS, attempts, quizzes)
+    ? calculateLeaderboard(selectedClass, classStudents, attempts, quizzes)
     : [];
 
   const currentUserRank = leaderboard.find(e => e.studentId === user?.id);
@@ -87,7 +95,7 @@ export default function LeaderboardPage() {
                 <div>
                   <p className="font-semibold text-slate-900">Your Current Rank</p>
                   <p className="text-sm text-slate-600">
-                    {currentUserRank.totalXP.toLocaleString()} XP • {Math.round(currentUserRank.accuracy)}% accuracy
+                    {currentUserRank.totalXP.toLocaleString()} points • {Math.round(currentUserRank.accuracy)}% accuracy
                   </p>
                 </div>
               </div>
@@ -127,7 +135,7 @@ export default function LeaderboardPage() {
                   <Trophy className="w-5 h-5 text-amber-500" />
                   Class Rankings
                 </CardTitle>
-                <CardDescription>Based on total XP from class quizzes</CardDescription>
+                <CardDescription>Based on total points from class quizzes</CardDescription>
               </div>
               <Badge variant="secondary">{leaderboard.length} students</Badge>
             </div>
@@ -187,13 +195,13 @@ export default function LeaderboardPage() {
             <div className="mt-6 p-4 bg-slate-50 rounded-xl">
               <h3 className="font-semibold text-slate-900 mb-2">Ranking Rules</h3>
               <ul className="text-sm text-slate-600 space-y-1">
-                <li>1. Primary: Total XP from class quizzes</li>
+                <li>1. Primary: Total points from class quizzes</li>
                 <li>2. Tie-breaker: Higher accuracy percentage</li>
                 <li>3. Tie-breaker: Faster average completion time</li>
                 <li>4. Tie-breaker: Earlier first completion</li>
               </ul>
               <p className="text-xs text-slate-500 mt-3">
-                Note: Practice mode XP is not counted in class rankings.
+                Note: Practice mode points are not counted in class rankings.
               </p>
             </div>
           </CardContent>

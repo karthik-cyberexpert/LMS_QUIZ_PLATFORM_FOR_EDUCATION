@@ -66,7 +66,7 @@ export default function Home() {
       return; // Stop loading state here as we are navigating
     } else {
       toast.error('Login failed', {
-        description: 'Invalid email or password. Try: alice@student.edu or professor.smith@school.edu',
+        description: 'Invalid email or password.',
       });
     }
     setLoading(false);
@@ -138,7 +138,7 @@ export default function Home() {
             y: [0, -50, 0]
           }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute -top-[20%] -right-[10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[120px]" 
+          className="absolute -top-[20%] -right-[10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[120px] will-change-transform" 
         />
         <motion.div 
           animate={{ 
@@ -148,7 +148,7 @@ export default function Home() {
             y: [0, 70, 0]
           }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute top-[30%] -left-[10%] w-[50%] h-[50%] bg-accent/10 rounded-full blur-[100px]" 
+          className="absolute top-[30%] -left-[10%] w-[50%] h-[50%] bg-accent/10 rounded-full blur-[100px] will-change-transform" 
         />
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
       </div>
@@ -193,18 +193,18 @@ export default function Home() {
               >
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary mb-8 animate-float">
                   <Sparkles className="w-4 h-4" />
-                  <span className="text-sm font-bold uppercase tracking-widest">Next-Gen Learning</span>
+                  <span className="text-sm font-bold uppercase tracking-widest">Smart Learning</span>
                 </div>
                 
                 <h1 className="text-6xl md:text-8xl font-black tracking-tight mb-8 leading-tight">
                   <span className="text-foreground">Elevate Your </span>
                   <br className="hidden md:block" />
-                  <span className="text-gradient">Intelligence</span>
+                  <span className="text-gradient">Knowledge</span>
                 </h1>
                 
                 <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-medium">
-                  Experience the future of education with AI-driven assessments, 
-                  proctoring protection, and gamified progress tracking.
+                  Learn better with AI quizzes, secure testing, 
+                  and fun rewards to track your progress.
                 </p>
                 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16">
@@ -228,12 +228,6 @@ export default function Home() {
                   </Button>
                 </div>
 
-                <div className="bg-card/50 backdrop-blur-sm border border-border/40 p-4 rounded-2xl inline-block">
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-accent" />
-                    Demo credentials available in the sign-in modal
-                  </p>
-                </div>
               </motion.div>
             </div>
           </div>
@@ -244,7 +238,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto">
             <div className="mb-16">
               <h2 className="text-4xl md:text-5xl font-black mb-4">Master Every Feature</h2>
-              <p className="text-xl text-muted-foreground font-medium">Engineered for excellence in modern pedagogy.</p>
+              <p className="text-xl text-muted-foreground font-medium">Built to help you teach and learn better.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 auto-rows-[280px]">
@@ -258,8 +252,8 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20 mb-6 font-black text-white">
                     <Brain className="w-8 h-8" />
                   </div>
-                  <h3 className="text-3xl font-black mb-3">AI Engine Architecture</h3>
-                  <p className="text-lg text-muted-foreground max-w-md font-medium">Generate deep-learning assessments from any topic or document in seconds.</p>
+                  <h3 className="text-3xl font-black mb-3">AI Powered Quizzes</h3>
+                  <p className="text-lg text-muted-foreground max-w-md font-medium">Create smart quizzes from any topic or document in seconds.</p>
                 </div>
               </motion.div>
 
@@ -285,8 +279,8 @@ export default function Home() {
               >
                 <Shield className="w-12 h-12 text-primary" />
                 <div>
-                  <h3 className="text-2xl font-black text-white mb-2">Integrity Shield</h3>
-                  <p className="text-slate-400 font-medium">Multi-layered proctoring with behavioral analysis.</p>
+                  <h3 className="text-2xl font-black text-white mb-2">Secure Testing</h3>
+                  <p className="text-slate-400 font-medium">Stay fair with built-in security and monitoring.</p>
                 </div>
               </motion.div>
 
@@ -296,9 +290,9 @@ export default function Home() {
                 className="md:col-span-8 group relative overflow-hidden rounded-3xl glass-card p-8 flex items-center justify-between"
               >
                 <div className="max-w-md">
-                  <h3 className="text-3xl font-black mb-4">Immersive Rewards</h3>
+                  <h3 className="text-3xl font-black mb-4">Fun Rewards</h3>
                   <p className="text-lg text-muted-foreground font-medium">
-                    Drive engagement with dynamic XP systems, achievement badges, and real-time leaderboards.
+                    Stay motivated with points, badges, and class rankings to see how you are doing.
                   </p>
                 </div>
                 <div className="hidden lg:flex gap-4">
@@ -318,10 +312,10 @@ export default function Home() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
           <div className="max-w-4xl mx-auto text-center relative z-10">
             <h2 className="text-5xl md:text-7xl font-black text-white mb-8">
-              Ready to <span className="text-primary italic">Transform</span> Learning?
+              Ready to <span className="text-primary italic">Start</span> Learning?
             </h2>
             <p className="text-2xl text-slate-400 mb-12 font-medium">
-              Join the ecosystem of elite educators and students.
+              Join our community of teachers and students.
             </p>
             <Button
               size="lg"
@@ -347,8 +341,8 @@ export default function Home() {
             <span className="text-xl font-black text-foreground">QuizMaster AI</span>
           </div>
           <div className="text-muted-foreground font-medium text-center md:text-right">
-            <p>© 2026 QuizMaster AI Ecosystem. All rights architectural.</p>
-            <p className="text-sm mt-1">Secured by Cryptographic Integrity Shield.</p>
+            <p>© 2026 QuizMaster AI. All rights reserved.</p>
+            <p className="text-sm mt-1">Secure and reliable platform for everyone.</p>
           </div>
         </div>
       </footer>
@@ -371,45 +365,43 @@ export default function Home() {
               className="w-full max-w-md"
             >
               <Card className="border border-white/10 shadow-2xl bg-card overflow-hidden rounded-[2.5rem]">
-                <CardHeader className="text-center pb-2 pt-10">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-xl shadow-primary/20">
-                    <Brain className="w-10 h-10 text-white" />
+                <CardHeader className="text-center pb-1 pt-3">
+                  <div className="w-10 h-10 mx-auto mb-1 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+                    <Brain className="w-5 h-5 text-white" />
                   </div>
-                  <CardTitle className="text-3xl font-black mb-2 tracking-tight">Access Ecosystem</CardTitle>
-                  <CardDescription className="text-lg font-medium text-muted-foreground">
-                    {authTab === 'login' ? 'Authenticate your session' : 'Initialize new profile'}
-                  </CardDescription>
+                  <CardTitle className="text-lg font-black tracking-tight">Sign In / Register</CardTitle>
                 </CardHeader>
-                <CardContent className="px-8 pb-10">
+                <CardContent className="px-8 pb-3">
                   <Tabs value={authTab} onValueChange={(v) => setAuthTab(v as 'login' | 'register')}>
-                    <TabsList className="grid w-full grid-cols-2 mb-8 bg-secondary/50 p-1 rounded-2xl overflow-hidden h-14">
-                      <TabsTrigger value="login" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg font-bold text-base">Sign In</TabsTrigger>
-                      <TabsTrigger value="register" className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg font-bold text-base">Register</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2 mb-3 bg-secondary/50 p-1 rounded-xl overflow-hidden h-9">
+                      <TabsTrigger value="login" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md font-black text-[10px] uppercase">Sign In</TabsTrigger>
+                      <TabsTrigger value="register" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md font-black text-[10px] uppercase">Register</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="login">
-                      <form onSubmit={handleLogin} className="space-y-5">
-                        <div className="space-y-2">
-                          <Label htmlFor="login-email" className="font-bold text-sm ml-1">Email Identifier</Label>
+                      <form onSubmit={handleLogin} className="space-y-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="login-email" className="text-xs font-bold ml-1">Email Address</Label>
                           <Input
                             id="login-email"
                             type="email"
                             placeholder="user@system.com"
                             value={loginEmail}
                             onChange={(e) => setLoginEmail(e.target.value)}
-                            className="h-14 rounded-2xl border-border bg-secondary/30 focus:bg-background transition-all px-5"
+                            className="h-10 rounded-xl px-4 text-sm bg-secondary/30 focus:bg-background transition-all"
                             required
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="login-password" className="font-bold text-sm ml-1">Password</Label>
+                        <div className="space-y-1">
+                          <Label htmlFor="login-password" className="text-xs font-bold ml-1">Password</Label>
                           <div className="relative">
                             <Input
                               id="login-password"
                               type={showPassword ? 'text' : 'password'}
-                              placeholder="Enter any password"
+                              placeholder="••••••••"
                               value={loginPassword}
                               onChange={(e) => setLoginPassword(e.target.value)}
+                              className="h-10 rounded-xl px-4 text-sm"
                               required
                             />
                             <button
@@ -417,65 +409,48 @@ export default function Home() {
                               onClick={() => setShowPassword(!showPassword)}
                               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                             >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                             </button>
                           </div>
                         </div>
                         <Button
                           type="submit"
-                          className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                          className="w-full h-11 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 mt-2"
                           disabled={loading}
                         >
-                          {loading ? 'Signing in...' : 'Sign In'}
+                          {loading ? 'Entering...' : 'Sign In'}
                         </Button>
                       </form>
-                      <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs text-slate-500 mb-2">Demo accounts:</p>
-                        <div className="space-y-1 text-xs font-mono">
-                          <button
-                            type="button"
-                            onClick={() => { setLoginEmail('professor.smith@school.edu'); setLoginPassword('demo'); }}
-                            className="block w-full text-left text-violet-600 hover:underline"
-                          >
-                            Teacher: professor.smith@school.edu
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setLoginEmail('alice@student.edu'); setLoginPassword('demo'); }}
-                            className="block w-full text-left text-violet-600 hover:underline"
-                          >
-                            Student: alice@student.edu
-                          </button>
-                        </div>
-                      </div>
                     </TabsContent>
 
                     <TabsContent value="register">
-                      <form onSubmit={handleRegister} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="register-name">Full Name</Label>
+                      <form onSubmit={handleRegister} className="space-y-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="register-name" className="text-xs font-bold ml-1">Full Name</Label>
                           <Input
                             id="register-name"
                             type="text"
                             placeholder="John Doe"
                             value={registerName}
                             onChange={(e) => setRegisterName(e.target.value)}
+                            className="h-10 rounded-xl px-4 text-sm"
                             required
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="register-email">Email</Label>
+                        <div className="space-y-1">
+                          <Label htmlFor="register-email" className="text-xs font-bold ml-1">Email</Label>
                           <Input
                             id="register-email"
                             type="email"
                             placeholder="your@email.com"
                             value={registerEmail}
                             onChange={(e) => setRegisterEmail(e.target.value)}
+                            className="h-10 rounded-xl px-4 text-sm"
                             required
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="register-password">Password</Label>
+                        <div className="space-y-1">
+                          <Label htmlFor="register-password" className="text-xs font-bold ml-1">Password</Label>
                           <div className="relative">
                             <Input
                               id="register-password"
@@ -483,6 +458,7 @@ export default function Home() {
                               placeholder="Create a password"
                               value={registerPassword}
                               onChange={(e) => setRegisterPassword(e.target.value)}
+                              className="h-10 rounded-xl px-4 text-sm"
                               required
                             />
                             <button
@@ -494,38 +470,38 @@ export default function Home() {
                             </button>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label>I am a...</Label>
-                          <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs font-bold ml-1">I am a...</Label>
+                          <div className="grid grid-cols-2 gap-2">
                             <button
                               type="button"
                               onClick={() => setRegisterRole('teacher')}
-                              className={`p-4 rounded-xl border-2 transition-all ${
+                              className={`p-2 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
                                 registerRole === 'teacher'
                                   ? 'border-violet-500 bg-violet-50 text-violet-700'
                                   : 'border-slate-200 hover:border-violet-200'
                               }`}
                             >
-                              <GraduationCap className="w-6 h-6 mx-auto mb-2" />
-                              <span className="text-sm font-medium">Teacher</span>
+                              <GraduationCap className="w-4 h-4" />
+                              <span className="text-xs font-medium">Teacher</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setRegisterRole('student')}
-                              className={`p-4 rounded-xl border-2 transition-all ${
+                              className={`p-2 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
                                 registerRole === 'student'
                                   ? 'border-violet-500 bg-violet-50 text-violet-700'
                                   : 'border-slate-200 hover:border-violet-200'
                               }`}
                             >
-                              <BookOpen className="w-6 h-6 mx-auto mb-2" />
-                              <span className="text-sm font-medium">Student</span>
+                              <BookOpen className="w-4 h-4" />
+                              <span className="text-xs font-medium">Student</span>
                             </button>
                           </div>
                         </div>
                         <Button
                           type="submit"
-                          className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                          className="w-full h-11 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 mt-2"
                           disabled={loading}
                         >
                           {loading ? 'Creating account...' : 'Create Account'}
@@ -536,7 +512,7 @@ export default function Home() {
 
                   <button
                     onClick={() => setShowAuth(false)}
-                    className="w-full mt-4 text-sm text-slate-500 hover:text-slate-700"
+                    className="w-full mt-1 text-[10px] font-bold text-slate-400 hover:text-primary transition-colors tracking-widest uppercase"
                   >
                     Cancel
                   </button>

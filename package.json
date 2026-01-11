@@ -4,6 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "next dev --turbopack",
+        "dev:all": "npm run dev",
         "build": "next build",
         "start": "next start",
         "lint": "next lint"
@@ -70,6 +71,7 @@
         "mini-svg-data-uri": "^1.4.4",
         "motion": "^12.23.24",
         "motion-dom": "^12.23.23",
+        "mysql2": "^3.16.0",
         "next": "15.3.5",
         "next-themes": "^0.4.6",
         "qss": "^3.0.0",
@@ -100,6 +102,7 @@
     "devDependencies": {
         "@eslint/eslintrc": "^3.3.1",
         "@tailwindcss/postcss": "^4",
+        "@types/bcrypt": "^6.0.0",
         "@types/node": "^20",
         "@types/react": "^19",
         "@types/react-dom": "^19",

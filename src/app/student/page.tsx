@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,30 +25,31 @@ import {
   TrendingUp,
   Zap,
   FileText,
+  FileQuestion,
 } from 'lucide-react';
 
 export default function StudentDashboard() {
   const { user, getStudentClasses, quizzes, attempts, joinClass } = useAuth();
   const [inviteCode, setInviteCode] = useState('');
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
-  const studentClasses = getStudentClasses();
+  const studentClasses = useMemo(() => getStudentClasses(), [getStudentClasses]);
 
-  const availableQuizzes = quizzes.filter(q => 
+  const availableQuizzes = useMemo(() => quizzes.filter((q: any) => 
     q.isPublished && 
-    studentClasses.some(c => c.id === q.classId) &&
+    studentClasses.some((c: any) => c.id === q.classId) &&
     (!q.deadline || new Date(q.deadline) > new Date())
-  );
+  ), [quizzes, studentClasses]);
 
-  const myAttempts = attempts.filter(a => a.studentId === user?.id);
-  const completedQuizIds = new Set(myAttempts.map(a => a.quizId));
+  const myAttempts = useMemo(() => attempts.filter((a: any) => a.studentId === user?.id), [attempts, user]);
+  const completedQuizIds = useMemo(() => new Set(myAttempts.map((a: any) => a.quizId)), [myAttempts]);
 
-  const pendingQuizzes = availableQuizzes.filter(q => !completedQuizIds.has(q.id));
-  const recentAttempts = myAttempts.sort((a, b) => 
+  const pendingQuizzes = useMemo(() => availableQuizzes.filter((q: any) => !completedQuizIds.has(q.id)), [availableQuizzes, completedQuizIds]);
+  const recentAttempts = useMemo(() => [...myAttempts].sort((a: any, b: any) => 
     new Date(b.submittedAt || b.startedAt).getTime() - new Date(a.submittedAt || a.startedAt).getTime()
-  ).slice(0, 5);
+  ).slice(0, 5), [myAttempts]);
 
-  const handleJoinClass = () => {
-    if (joinClass(inviteCode.toUpperCase())) {
+  const handleJoinClass = async () => {
+    if (await joinClass(inviteCode.toUpperCase())) {
       toast.success('Class joined successfully!', {
         description: 'You can now access quizzes from this class.',
       });
@@ -61,7 +62,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const getQuizById = (quizId: string) => quizzes.find(q => q.id === quizId);
+  const getQuizById = (quizId: string) => quizzes.find((q: any) => q.id === quizId);
 
   return (
     <div className="space-y-10 pb-12">
@@ -72,12 +73,12 @@ export default function StudentDashboard() {
         >
           <div className="flex items-center gap-2 text-primary font-bold mb-2">
             <Sparkles className="w-5 h-5" />
-            <span>Dashboard Overview</span>
+            <span>Student Dashboard</span>
           </div>
           <h1 className="text-4xl font-black text-foreground tracking-tight">
             Welcome back, <span className="text-gradient">{user?.name?.split(' ')[0]}</span>!
           </h1>
-          <p className="text-muted-foreground text-lg mt-1 font-medium">Ready to dominate your assessments today?</p>
+          <p className="text-muted-foreground text-lg mt-1 font-medium">Ready to take some quizzes today?</p>
         </motion.div>
         
         <div className="flex items-center gap-4">
@@ -90,9 +91,9 @@ export default function StudentDashboard() {
             </DialogTrigger>
             <DialogContent className="rounded-[2rem] border-white/10 glass-card">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-black">Initialize Enrollment</DialogTitle>
+                <DialogTitle className="text-2xl font-black">Join a Class</DialogTitle>
                 <DialogDescription className="text-base font-medium">
-                  Enter the secure invite code provided by your instructor.
+                  Enter the invite code from your teacher.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 pt-6">
@@ -107,16 +108,16 @@ export default function StudentDashboard() {
                   className="w-full h-14 text-lg font-bold rounded-2xl bg-primary shadow-xl shadow-primary/20"
                   disabled={!inviteCode}
                 >
-                  Confirm Join
+                  Join Class
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
           
           <Link href="/student/practice">
-            <Button className="h-12 px-6 rounded-2xl bg-primary font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform group">
+            <Button className="h-12 px-6 rounded-2xl bg-primary font-bold shadow-lg shadow-primary/20 hover:scale-[1.05] transition-transform group">
               <Target className="w-5 h-5 mr-2" />
-              Training Zone
+              Practice Area
             </Button>
           </Link>
         </div>
@@ -127,14 +128,14 @@ export default function StudentDashboard() {
           <Card className="glass-card border-none relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 blur-3xl -mr-16 -mt-16 group-hover:bg-amber-400/20 transition-colors" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Total XP</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Total Points</CardTitle>
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-amber-500" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-black text-foreground">{user?.totalXP?.toLocaleString()}</div>
-              <p className="text-sm text-amber-600 font-bold mt-1">Earning: +250/day</p>
+              <p className="text-sm text-amber-600 font-bold mt-1">Earning points every day!</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -150,7 +151,7 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-black text-foreground">{completedQuizIds.size}</div>
-              <p className="text-sm text-emerald-600 font-bold mt-1">{pendingQuizzes.length} remaining units</p>
+              <p className="text-sm text-emerald-600 font-bold mt-1">{pendingQuizzes.length} quizzes left</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -159,7 +160,7 @@ export default function StudentDashboard() {
           <Card className="glass-card border-none relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl -mr-16 -mt-16" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Achievements</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Badges</CardTitle>
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Award className="w-5 h-5 text-primary" />
               </div>
@@ -186,14 +187,14 @@ export default function StudentDashboard() {
           <Card className="glass-card border-none relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-3xl -mr-16 -mt-16" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Active Units</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">My Classes</CardTitle>
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
                 <BookOpen className="w-5 h-5 text-rose-500" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-black text-foreground">{studentClasses.length}</div>
-              <p className="text-sm text-rose-600 font-bold mt-1">Enrolled Ecosystems</p>
+              <p className="text-sm text-rose-600 font-bold mt-1">Groups joined</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -207,13 +208,13 @@ export default function StudentDashboard() {
               <div>
                 <CardTitle className="text-2xl font-black flex items-center gap-3">
                   <Zap className="w-6 h-6 text-primary fill-primary/20" />
-                  Mission Critical: Pending Units
+                  Upcoming Quizzes
                 </CardTitle>
-                <CardDescription className="text-base font-medium">Prioritized assessments for your active classes.</CardDescription>
+                <CardDescription className="text-base font-medium">Quizzes you need to complete.</CardDescription>
               </div>
               <Link href="/student/classes">
                 <Button variant="ghost" className="font-bold hover:text-primary transition-colors group">
-                  Explore All
+                  View All
                   <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
@@ -221,7 +222,7 @@ export default function StudentDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {pendingQuizzes.slice(0, 3).map((quiz, i) => {
+              {pendingQuizzes.slice(0, 3).map((quiz: any, i: number) => {
                 const cls = studentClasses.find(c => c.id === quiz.classId);
                 const existingAttempts = myAttempts.filter(a => a.quizId === quiz.id);
                 const canRetry = existingAttempts.length < quiz.maxAttempts;
@@ -249,16 +250,16 @@ export default function StudentDashboard() {
                         <Clock className="w-4 h-4 text-primary" />
                         {Math.floor(quiz.timeLimit / 60)}m
                       </div>
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background/50">
-                        <FileText className="w-4 h-4 text-accent" />
-                        {quiz.questions.length} Q
-                      </div>
+                        <span className="flex items-center gap-1">
+                          <FileQuestion className="w-3.5 h-3.5 text-primary" />
+                          {quiz.questionCount ?? quiz.questions?.length ?? 0} Questions
+                        </span>
                     </div>
 
                     {quiz.deadline && (
                       <div className="flex items-center gap-2 text-xs font-black text-amber-600 mb-6 bg-amber-500/5 p-2 rounded-xl">
                         <Calendar className="w-4 h-4" />
-                        EXPIRY: {new Date(quiz.deadline).toLocaleDateString()}
+                        DUE DATE: {new Date(quiz.deadline).toLocaleDateString()}
                       </div>
                     )}
 
@@ -268,7 +269,7 @@ export default function StudentDashboard() {
                         disabled={!canRetry}
                       >
                         <Play className="w-4 h-4 mr-2" />
-                        {existingAttempts.length > 0 ? 'Retry Mission' : 'Initiate Unit'}
+                        {existingAttempts.length > 0 ? 'Try Again' : 'Start Quiz'}
                       </Button>
                     </Link>
                   </motion.div>
@@ -284,20 +285,20 @@ export default function StudentDashboard() {
           <CardHeader className="pb-4">
             <CardTitle className="text-2xl font-black flex items-center gap-3">
               <TrendingUp className="w-6 h-6 text-emerald-500" />
-              Activity Feed
+              Recent Results
             </CardTitle>
-            <CardDescription className="font-medium text-base">Your latest operational metrics.</CardDescription>
+            <CardDescription className="font-medium text-base">Your latest quiz results.</CardDescription>
           </CardHeader>
           <CardContent>
             {recentAttempts.length === 0 ? (
               <div className="text-center py-12 bg-secondary/20 rounded-3xl border-2 border-dashed border-border">
                 <Target className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground font-bold">No active history detected.</p>
-                <p className="text-sm text-muted-foreground/70">Complete your first mission to initialize metrics.</p>
+                <p className="text-muted-foreground font-bold">No history found yet.</p>
+                <p className="text-sm text-muted-foreground/70">Complete your first quiz to see your results.</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {recentAttempts.map((attempt) => {
+                {recentAttempts.map((attempt: any, i: number) => {
                   const quiz = getQuizById(attempt.quizId);
                   if (!quiz) return null;
                   return (
@@ -318,7 +319,7 @@ export default function StudentDashboard() {
                       <div className="flex-1 min-w-0">
                         <h4 className="font-black text-foreground truncate text-lg leading-tight">{quiz.title}</h4>
                         <p className="text-sm font-bold text-muted-foreground/80 mt-1">
-                          {attempt.score}/{attempt.maxScore} Pts • <span className="text-primary">+{attempt.xpEarned} XP</span>
+                          {attempt.score}/{attempt.maxScore} Pts • <span className="text-primary">{attempt.xpEarned} Points</span>
                         </p>
                       </div>
                       <Badge variant={attempt.isFlagged ? 'destructive' : 'secondary'} className="rounded-lg font-black text-[10px] uppercase shadow-sm">
@@ -336,16 +337,16 @@ export default function StudentDashboard() {
           <CardHeader className="pb-4">
             <CardTitle className="text-2xl font-black flex items-center gap-3">
               <Award className="w-6 h-6 text-primary" />
-              Trophy Room
+              My Medals
             </CardTitle>
-            <CardDescription className="font-medium text-base">Achievements decrypted and active.</CardDescription>
+            <CardDescription className="font-medium text-base">Badges you have earned.</CardDescription>
           </CardHeader>
           <CardContent>
             {!user?.badges || user.badges.length === 0 ? (
               <div className="text-center py-12 bg-secondary/20 rounded-3xl border-2 border-dashed border-border">
                 <Award className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground font-bold">Trophy cabinet empty.</p>
-                <p className="text-sm text-muted-foreground/70">Complete achievements to unlock relics.</p>
+                <p className="text-muted-foreground font-bold">No medals yet.</p>
+                <p className="text-sm text-muted-foreground/70">Complete quizzes to earn medals.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -386,13 +387,13 @@ export default function StudentDashboard() {
             <div>
               <CardTitle className="text-2xl font-black flex items-center gap-3">
                 <BookOpen className="w-6 h-6 text-rose-500" />
-                Enrollment Overview
+                My Classes
               </CardTitle>
-              <CardDescription className="font-medium text-base">Current academic ecosystems in operation.</CardDescription>
+              <CardDescription className="font-medium text-base">Classes you are currently in.</CardDescription>
             </div>
             <Link href="/student/classes">
               <Button variant="ghost" className="font-bold hover:text-primary transition-colors group">
-                All Systems
+                View All
                 <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
@@ -402,16 +403,16 @@ export default function StudentDashboard() {
           {studentClasses.length === 0 ? (
             <div className="text-center py-12 bg-secondary/20 rounded-3xl border-2 border-dashed border-border">
               <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-muted-foreground font-bold">No active enrollments.</p>
+              <p className="text-muted-foreground font-bold">You have not joined any classes yet.</p>
               <Button variant="link" onClick={() => setJoinDialogOpen(true)} className="mt-2 text-primary font-black">
-                Initialize First Enrollment
+                Join your first class
               </Button>
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {studentClasses.map((cls, i) => {
-                const classQuizzes = quizzes.filter(q => q.classId === cls.id && q.isPublished);
-                const completedInClass = classQuizzes.filter(q => completedQuizIds.has(q.id)).length;
+              {studentClasses.map((cls: any, i: number) => {
+                const classQuizzes = quizzes.filter((q: any) => q.classId === cls.id && q.isPublished);
+                const completedInClass = classQuizzes.filter((q: any) => completedQuizIds.has(q.id)).length;
                 const progress = classQuizzes.length > 0 
                   ? Math.round((completedInClass / classQuizzes.length) * 100) 
                   : 0;
@@ -430,9 +431,9 @@ export default function StudentDashboard() {
                           <p className="text-muted-foreground font-medium mt-2 line-clamp-2 leading-tight">{cls.description}</p>
                         </div>
                         <div className="mt-8 space-y-3">
-                          <div className="flex items-center justify-between text-sm font-black uppercase tracking-wider">
-                            <span className="text-muted-foreground">Progression</span>
-                            <span className="text-foreground">{completedInClass}/{classQuizzes.length} UNITS</span>
+                           <div className="flex items-center justify-between text-sm font-black uppercase tracking-wider">
+                            <span className="text-muted-foreground">Progress</span>
+                            <span className="text-foreground">{completedInClass}/{classQuizzes.length} QUIZZES</span>
                           </div>
                           <div className="relative h-3 w-full bg-background/50 rounded-full overflow-hidden border border-border/30">
                             <motion.div 
@@ -442,7 +443,7 @@ export default function StudentDashboard() {
                               className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-accent" 
                             />
                           </div>
-                          <div className="text-[10px] font-black text-primary text-right italic">{progress}% SYSTEM SYNC</div>
+                           <div className="text-[10px] font-black text-primary text-right italic">{progress}% COMPLETE</div>
                         </div>
                       </div>
                     </Link>

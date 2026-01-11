@@ -143,7 +143,7 @@ export default function PracticeModePage() {
     if (correct) {
       const messages = ['Correct!', 'Nice!', 'Great job!', 'Well done!'];
       toast.success(messages[Math.floor(Math.random() * messages.length)], {
-        description: `+${xpEarned} XP`,
+        description: `+${xpEarned} Points`,
       });
     } else if (!timeout) {
       toast.error('Incorrect', {
@@ -228,11 +228,11 @@ export default function PracticeModePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="very_easy">Very Easy (0.6x XP)</SelectItem>
-                      <SelectItem value="easy">Easy (0.8x XP)</SelectItem>
-                      <SelectItem value="medium">Medium (1.0x XP)</SelectItem>
-                      <SelectItem value="hard">Hard (1.25x XP)</SelectItem>
-                      <SelectItem value="very_hard">Very Hard (1.5x XP)</SelectItem>
+                      <SelectItem value="very_easy">Very Easy (0.6x Points)</SelectItem>
+                      <SelectItem value="easy">Easy (0.8x Points)</SelectItem>
+                      <SelectItem value="medium">Medium (1.0x Points)</SelectItem>
+                      <SelectItem value="hard">Hard (1.25x Points)</SelectItem>
+                      <SelectItem value="very_hard">Very Hard (1.5x Points)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -279,7 +279,7 @@ export default function PracticeModePage() {
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold shrink-0">3</div>
-                  <p>Earn XP for correct answers (not counted in leaderboard)</p>
+                  <p>Earn points for correct answers (not counted in leaderboard)</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold shrink-0">4</div>
@@ -358,7 +358,7 @@ export default function PracticeModePage() {
           <CardContent className="pt-4 text-center">
             <Sparkles className="w-5 h-5 text-amber-600 mx-auto mb-1" />
             <div className="text-2xl font-bold text-amber-700">{stats.totalXP}</div>
-            <div className="text-xs text-amber-600">XP Earned</div>
+            <div className="text-xs text-amber-600">Points Earned</div>
           </CardContent>
         </Card>
       </div>

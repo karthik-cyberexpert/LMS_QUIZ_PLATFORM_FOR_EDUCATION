@@ -19,7 +19,7 @@ import {
   simulateAIQuizGeneration, 
   simulatePDFQuizGeneration 
 } from '@/lib/mock-data';
-import { Quiz, QuizQuestion, Difficulty, AIQuizConfig, PDFQuizConfig } from '@/lib/types';
+import { Quiz, QuizQuestion, QuizOption, Difficulty, AIQuizConfig, PDFQuizConfig } from '@/lib/types';
 import {
   ArrowLeft,
   ArrowRight,
@@ -47,7 +47,7 @@ import Link from 'next/link';
 export default function CreateQuizPage() {
   const { user, getTeacherClasses, addQuiz } = useAuth();
   const router = useRouter();
-  const teacherClasses = getTeacherClasses();
+  const teacherClasses = React.useMemo(() => getTeacherClasses(), [getTeacherClasses]);
 
   const [creationMethod, setCreationMethod] = useState<'manual' | 'ai_topic' | 'ai_pdf'>('manual');
   const [loading, setLoading] = useState(false);
@@ -61,6 +61,8 @@ export default function CreateQuizPage() {
   const [timeLimit, setTimeLimit] = useState(600);
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadline, setDeadline] = useState('');
+  const [isOtherSubject, setIsOtherSubject] = useState(false);
+  const [isOtherQuantity, setIsOtherQuantity] = useState(false);
 
   const [questions, setQuestions] = useState<QuizQuestion[]>([
     {
@@ -77,7 +79,7 @@ export default function CreateQuizPage() {
   ]);
 
   const [aiConfig, setAiConfig] = useState<AIQuizConfig>({
-    subject: 'Computer Science',
+    subject: '',
     topic: '',
     description: '',
     difficulty: 'medium',
@@ -90,12 +92,27 @@ export default function CreateQuizPage() {
   const [pdfConfig, setPdfConfig] = useState<PDFQuizConfig>({
     fileName: '',
     fileContent: '',
+    subject: '',
     difficulty: 'medium',
     numberOfQuestions: 5,
     optionsPerQuestion: 4,
     marksPerQuestion: 10,
     timeLimit: 600,
   });
+
+  const [pdfOtherSubject, setPdfOtherSubject] = useState(false);
+  const [pdfOtherQuantity, setPdfOtherQuantity] = useState(false);
+
+  useEffect(() => {
+    if (teacherClasses.length > 0) {
+      if (aiConfig.subject === '' && !isOtherSubject) {
+        setAiConfig(prev => ({ ...prev, subject: teacherClasses[0].name }));
+      }
+      if (pdfConfig.subject === '' && !pdfOtherSubject) {
+        setPdfConfig(prev => ({ ...prev, subject: teacherClasses[0].name }));
+      }
+    }
+  }, [teacherClasses, aiConfig.subject, pdfConfig.subject, isOtherSubject, pdfOtherSubject]);
 
   const addQuestion = () => {
     const newId = String(questions.length + 1);
@@ -123,19 +140,19 @@ export default function CreateQuizPage() {
 
   const updateQuestion = (index: number, field: string, value: string | number) => {
     const updated = [...questions];
-    (updated[index] as Record<string, unknown>)[field] = value;
+    (updated[index] as any)[field] = value;
     setQuestions(updated);
   };
 
   const updateOption = (qIndex: number, oIndex: number, field: string, value: string | boolean) => {
     const updated = [...questions];
     if (field === 'isCorrect' && value === true) {
-      updated[qIndex].options = updated[qIndex].options.map((opt: { isCorrect: boolean }, i: number) => ({
+      updated[qIndex].options = updated[qIndex].options.map((opt: QuizOption, i: number) => ({
         ...opt,
         isCorrect: i === oIndex,
       }));
     } else {
-      (updated[qIndex].options[oIndex] as Record<string, unknown>)[field] = value;
+      (updated[qIndex].options[oIndex] as any)[field] = value;
     }
     setQuestions(updated);
   };
@@ -163,16 +180,36 @@ export default function CreateQuizPage() {
       toast.error('Please enter a topic');
       return;
     }
+    if (!aiConfig.subject) {
+      toast.error('Please select or enter a subject');
+      return;
+    }
+    if (aiConfig.numberOfQuestions <= 0 || aiConfig.numberOfQuestions > 50) {
+      toast.error('Please enter a number of questions between 1 and 50');
+      return;
+    }
     setLoading(true);
     try {
-      const quiz = await simulateAIQuizGeneration(aiConfig);
-      setGeneratedQuiz(quiz);
-      setShowPreview(true);
-      toast.success('Quiz generated successfully!', {
-        description: 'Review the questions before publishing.',
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aiConfig),
       });
-    } catch {
-      toast.error('Failed to generate quiz');
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate quiz');
+      }
+
+      const data = await response.json();
+      setGeneratedQuiz(data.quiz);
+      setShowPreview(true);
+      toast.success('Quiz generated from Topic!', {
+        description: 'Review the AI-generated questions.',
+      });
+    } catch (err: any) {
+      console.error('AI Generation Error:', err);
+      toast.error(err.message || 'Failed to generate quiz');
     }
     setLoading(false);
   };
@@ -196,16 +233,44 @@ export default function CreateQuizPage() {
       toast.error('Please upload a PDF file');
       return;
     }
+    if (!pdfConfig.subject) {
+      toast.error('Please select or enter a subject');
+      return;
+    }
+    if (pdfConfig.numberOfQuestions <= 0 || pdfConfig.numberOfQuestions > 50) {
+      toast.error('Please enter a number of questions between 1 and 50');
+      return;
+    }
     setLoading(true);
     try {
-      const quiz = await simulatePDFQuizGeneration(pdfConfig);
-      setGeneratedQuiz(quiz);
+      // For now, if we don't have a real PDF parser, we simulate the topic name 
+      // but use the real AI for generation logic based on filename/simulated topic
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...pdfConfig,
+          topic: pdfConfig.fileName.replace('.pdf', ''),
+          subject: pdfConfig.subject || 'Other',
+          description: `AI-generated quiz based on ${pdfConfig.fileName}`,
+          creationMethod: 'ai_pdf'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate quiz from PDF');
+      }
+
+      const data = await response.json();
+      setGeneratedQuiz(data.quiz);
       setShowPreview(true);
       toast.success('Quiz generated from PDF!', {
-        description: 'Review the questions before publishing.',
+        description: 'Review the AI-generated questions.',
       });
-    } catch {
-      toast.error('Failed to generate quiz from PDF');
+    } catch (err: any) {
+      console.error('PDF AI Generation Error:', err);
+      toast.error(err.message || 'Failed to generate quiz from PDF');
     }
     setLoading(false);
   };
@@ -220,7 +285,8 @@ export default function CreateQuizPage() {
     setQuestions(generatedQuiz.questions);
     setGeneratedQuiz(null);
     setShowPreview(false);
-    toast.success('Neural vectors merged into core assessment.');
+    setCreationMethod('manual');
+    toast.success('AI questions added to your quiz.');
   };
 
   const handleSaveQuiz = (publish: boolean) => {
@@ -295,12 +361,12 @@ export default function CreateQuizPage() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <Badge className="bg-primary/10 text-primary border-none font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
-                Architect Mode
+                Quiz Creator
               </Badge>
-              <span className="text-muted-foreground/40 font-black text-[10px] tracking-widest uppercase">ID: ALPHA-QUIZ-NEW</span>
+              <span className="text-muted-foreground/40 font-black text-[10px] tracking-widest uppercase">New Quiz</span>
             </div>
-            <h1 className="text-4xl font-black text-foreground tracking-tight leading-tight">Create Mission</h1>
-            <p className="text-muted-foreground font-bold mt-1">Configure assessment module and operational protocols</p>
+            <h1 className="text-4xl font-black text-foreground tracking-tight leading-tight">Create Quiz</h1>
+            <p className="text-muted-foreground font-bold mt-1">Set up your quiz details and questions</p>
           </div>
         </div>
 
@@ -317,7 +383,7 @@ export default function CreateQuizPage() {
             onClick={() => handleSaveQuiz(false)}
           >
             <Save className="w-4 h-4" />
-            Archive Draft
+            Save Draft
           </Button>
         </div>
       </div>
@@ -338,21 +404,21 @@ export default function CreateQuizPage() {
               className="gap-3 h-12 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg data-[state=active]:text-primary"
             >
               <FileText className="w-4 h-4" />
-              Manual Sync
+              Create Manually
             </TabsTrigger>
             <TabsTrigger 
               value="ai_topic" 
               className="gap-3 h-12 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg data-[state=active]:text-accent"
             >
               <Brain className="w-4 h-4" />
-              Neural Logic
+              AI Topic Generator
             </TabsTrigger>
             <TabsTrigger 
               value="ai_pdf" 
               className="gap-3 h-12 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg data-[state=active]:text-violet-500"
             >
               <Upload className="w-4 h-4" />
-              Source Intake
+              AI PDF Generator
             </TabsTrigger>
           </TabsList>
         </div>
@@ -368,27 +434,27 @@ export default function CreateQuizPage() {
                       <FileText className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-black tracking-tight">Quiz Metadata</CardTitle>
-                      <CardDescription className="font-bold text-muted-foreground">Primary configuration for the assessment unit</CardDescription>
+                      <CardTitle className="text-2xl font-black tracking-tight">Quiz Details</CardTitle>
+                      <CardDescription className="font-bold text-muted-foreground">General information about this quiz</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-10 space-y-8">
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-3">
-                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Quiz Designation</Label>
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Quiz Title</Label>
                       <Input
-                        placeholder="e.g., QUANTUM COMPUTING 101"
+                        placeholder="e.g., General Knowledge"
                         value={quizTitle}
                         onChange={(e) => setQuizTitle(e.target.value)}
                         className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-primary transition-all font-bold px-6"
                       />
                     </div>
                     <div className="space-y-3">
-                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Target Cohort</Label>
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Select Class</Label>
                       <Select value={selectedClass} onValueChange={setSelectedClass}>
                         <SelectTrigger className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-primary transition-all font-bold px-6">
-                          <SelectValue placeholder="Select Deployment Class" />
+                          <SelectValue placeholder="Choose a class" />
                         </SelectTrigger>
                         <SelectContent className="rounded-2xl border-2 border-border/50 glass-card">
                           {teacherClasses.map((cls: { id: string; name: string }) => (
@@ -398,35 +464,35 @@ export default function CreateQuizPage() {
                       </Select>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Mission Briefing</Label>
-                    <Textarea
-                      placeholder="Detailed operational instructions for students..."
-                      value={quizDescription}
-                      onChange={(e) => setQuizDescription(e.target.value)}
-                      className="min-h-[120px] rounded-[2rem] bg-secondary/30 border-2 border-border/50 focus:border-primary transition-all font-bold p-6"
-                    />
-                  </div>
+                    <div className="space-y-3">
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Quiz Description</Label>
+                      <Textarea
+                        placeholder="Enter a description for your students..."
+                        value={quizDescription}
+                        onChange={(e) => setQuizDescription(e.target.value)}
+                        className="min-h-[120px] rounded-[2rem] bg-secondary/30 border-2 border-border/50 focus:border-primary transition-all font-bold p-6"
+                      />
+                    </div>
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-3">
-                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Complexity Level</Label>
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Difficulty</Label>
                       <Select value={difficulty} onValueChange={(v: Difficulty) => setDifficulty(v)}>
                         <SelectTrigger className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-primary transition-all font-bold px-6">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="rounded-2xl border-2 border-border/50 glass-card">
-                          <SelectItem value="very_easy" className="font-bold rounded-xl m-1">NEOPHYTE (0.6x XP)</SelectItem>
-                          <SelectItem value="easy" className="font-bold rounded-xl m-1">INITIATE (0.8x XP)</SelectItem>
-                          <SelectItem value="medium" className="font-bold rounded-xl m-1">OPERATIVE (1.0x XP)</SelectItem>
-                          <SelectItem value="hard" className="font-bold rounded-xl m-1">VETERAN (1.25x XP)</SelectItem>
-                          <SelectItem value="very_hard" className="font-bold rounded-xl m-1">ELITE (1.5x XP)</SelectItem>
+                          <SelectItem value="very_easy" className="font-bold rounded-xl m-1">Very Easy (0.6x Points)</SelectItem>
+                          <SelectItem value="easy" className="font-bold rounded-xl m-1">Easy (0.8x Points)</SelectItem>
+                          <SelectItem value="medium" className="font-bold rounded-xl m-1">Medium (1.0x Points)</SelectItem>
+                          <SelectItem value="hard" className="font-bold rounded-xl m-1">Hard (1.25x Points)</SelectItem>
+                          <SelectItem value="very_hard" className="font-bold rounded-xl m-1">Very Hard (1.5x Points)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-4">
                       <div className="flex justify-between items-center ml-1">
-                        <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground">Temporal Limit</Label>
-                        <span className="font-black text-primary text-sm">{Math.floor(timeLimit / 60)}:00 Units</span>
+                        <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground">Time Limit</Label>
+                        <span className="font-black text-primary text-sm">{Math.floor(timeLimit / 60)}:00 Minutes</span>
                       </div>
                       <Slider
                         value={[timeLimit]}
@@ -446,8 +512,8 @@ export default function CreateQuizPage() {
                           <Clock className="w-5 h-5 text-accent" />
                         </div>
                         <div>
-                          <Label className="text-sm font-black uppercase tracking-tight">Submission Deadline</Label>
-                          <p className="text-xs text-muted-foreground font-bold">Lock mission synchronization after date</p>
+                          <Label className="text-sm font-black uppercase tracking-tight">Due Date</Label>
+                          <p className="text-xs text-muted-foreground font-bold">Close quiz after this date</p>
                         </div>
                       </div>
                       <Switch checked={hasDeadline} onCheckedChange={setHasDeadline} />
@@ -477,8 +543,8 @@ export default function CreateQuizPage() {
                       <Target className="w-5 h-5 text-foreground" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-black tracking-tight uppercase">Operational Units</h2>
-                      <p className="text-xs text-muted-foreground font-black uppercase tracking-widest">{questions.length} Vector(s)</p>
+                      <h2 className="text-xl font-black tracking-tight uppercase">Quiz Questions</h2>
+                      <p className="text-xs text-muted-foreground font-black uppercase tracking-widest">{questions.length} Question(s)</p>
                     </div>
                   </div>
                   <Button 
@@ -486,7 +552,7 @@ export default function CreateQuizPage() {
                     className="h-12 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary hover:scale-[1.05] active:scale-95 transition-all shadow-lg shadow-primary/20 gap-2"
                   >
                     <Plus className="w-4 h-4" />
-                    Inject Unit
+                    Add Question
                   </Button>
                 </div>
 
@@ -507,9 +573,9 @@ export default function CreateQuizPage() {
                         </div>
                         <div className="flex-1 space-y-6">
                           <div className="space-y-2">
-                            <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Question Vector</Label>
+                            <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Question Text</Label>
                             <Input
-                              placeholder="Enter operational query..."
+                              placeholder="Enter your question here..."
                               value={question.text}
                               onChange={(e) => updateQuestion(qIndex, 'text', e.target.value)}
                               className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-primary transition-all font-bold px-6"
@@ -570,7 +636,7 @@ export default function CreateQuizPage() {
                                   onChange={(e) => updateQuestion(qIndex, 'marks', parseInt(e.target.value) || 0)}
                                   className="w-16 h-8 bg-transparent border-none text-right font-black p-0 focus-visible:ring-0"
                                 />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">XP</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Points</span>
                               </div>
                               {questions.length > 1 && (
                                 <Button
@@ -596,7 +662,7 @@ export default function CreateQuizPage() {
                   className="w-full h-20 rounded-[2.5rem] border-2 border-dashed border-border/50 hover:border-primary hover:bg-primary/5 transition-all font-black uppercase text-xs tracking-[0.2em] gap-4"
                 >
                   <Plus className="w-6 h-6 text-primary" />
-                  Append New Operational Unit
+                  Add Another Question
                 </Button>
               </div>
             </TabsContent>
@@ -610,34 +676,60 @@ export default function CreateQuizPage() {
                       <Sparkles className="w-6 h-6 text-accent" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-black tracking-tight uppercase">Neural Synthesis</CardTitle>
-                      <CardDescription className="font-bold text-muted-foreground">Generate assessment vectors using advanced AI logic</CardDescription>
+                      <CardTitle className="text-2xl font-black tracking-tight uppercase">AI Question Generator</CardTitle>
+                      <CardDescription className="font-bold text-muted-foreground">Automatically generate questions on any topic.</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-10 space-y-8">
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-3">
-                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Subject domain</Label>
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Subject</Label>
                       <Select 
-                        value={aiConfig.subject} 
-                        onValueChange={(v) => setAiConfig(prev => ({ ...prev, subject: v }))}
+                        value={isOtherSubject ? 'other' : aiConfig.subject} 
+                        onValueChange={(v) => {
+                          if (v === 'other') {
+                            setIsOtherSubject(true);
+                            setAiConfig(prev => ({ ...prev, subject: '' }));
+                          } else {
+                            setIsOtherSubject(false);
+                            setAiConfig(prev => ({ ...prev, subject: v }));
+                          }
+                        }}
                       >
                         <SelectTrigger className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-accent transition-all font-bold px-6">
-                          <SelectValue />
+                          <SelectValue placeholder="Select Subject" />
                         </SelectTrigger>
                         <SelectContent className="rounded-2xl border-2 border-border/50 glass-card">
-                          <SelectItem value="Computer Science" className="font-bold rounded-xl m-1">Computer Science</SelectItem>
-                          <SelectItem value="Mathematics" className="font-bold rounded-xl m-1">Mathematics</SelectItem>
-                          <SelectItem value="History" className="font-bold rounded-xl m-1">History</SelectItem>
-                          <SelectItem value="Science" className="font-bold rounded-xl m-1">Science</SelectItem>
+                          {teacherClasses.map((cls: any) => (
+                            <SelectItem key={cls.id} value={cls.name} className="font-bold rounded-xl m-1">
+                              {cls.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="other" className="font-bold rounded-xl m-1 text-primary border-t border-border/50 mt-2 pt-2">
+                            Other Subject...
+                          </SelectItem>
                         </SelectContent>
                       </Select>
+                      {isOtherSubject && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-3"
+                        >
+                          <Input
+                            placeholder="Type subject name..."
+                            value={aiConfig.subject}
+                            onChange={(e) => setAiConfig(prev => ({ ...prev, subject: e.target.value }))}
+                            className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-accent transition-all font-bold px-6 uppercase"
+                          />
+                        </motion.div>
+                      )}
                     </div>
                     <div className="space-y-3">
-                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Topic node</Label>
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Topic</Label>
                       <Input
-                        placeholder="e.g., QUANTUM ENTANGLEMENT"
+                        placeholder="e.g., Photosynthesis"
                         value={aiConfig.topic}
                         onChange={(e) => setAiConfig(prev => ({ ...prev, topic: e.target.value }))}
                         className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-accent transition-all font-bold px-6 uppercase"
@@ -645,9 +737,9 @@ export default function CreateQuizPage() {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Prompt modifiers (Optional)</Label>
+                    <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Additional Instructions (Optional)</Label>
                     <Textarea
-                      placeholder="Specify focus areas or target learning objectives..."
+                      placeholder="e.g., focus on plant cells..."
                       value={aiConfig.description}
                       onChange={(e) => setAiConfig(prev => ({ ...prev, description: e.target.value }))}
                       className="min-h-[100px] rounded-[2rem] bg-secondary/30 border-2 border-border/50 focus:border-accent transition-all font-bold p-6"
@@ -655,35 +747,65 @@ export default function CreateQuizPage() {
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     {[
-                      { label: 'Complexity', key: 'difficulty', options: [
-                        { v: 'very_easy', l: 'NEO' }, { v: 'easy', l: 'INIT' }, { v: 'medium', l: 'OPER' }, { v: 'hard', l: 'VET' }, { v: 'very_hard', l: 'ELITE' }
+                      { label: 'Difficulty', key: 'difficulty', options: [
+                        { v: 'very_easy', l: 'Very Easy' }, { v: 'easy', l: 'Easy' }, { v: 'medium', l: 'Medium' }, { v: 'hard', l: 'Hard' }, { v: 'very_hard', l: 'Very Hard' }
                       ]},
-                      { label: 'Quantity', key: 'numberOfQuestions', options: [3, 5, 10, 15, 20].map(n => ({ v: n, l: `${n} Units` })) },
-                      { label: 'Variants', key: 'optionsPerQuestion', options: [2, 3, 4, 5, 6].map(n => ({ v: n, l: `${n} Opt` })) },
-                      { label: 'XP Weight', key: 'marksPerQuestion', options: [5, 10, 15, 20].map(n => ({ v: n, l: `${n} XP` })) },
+                      { label: 'Quantity', key: 'numberOfQuestions', options: [
+                        ...[3, 5, 10, 15, 20].map(n => ({ v: n, l: `${n} Questions` })),
+                        { v: 'other', l: 'Other...' }
+                      ]},
+                      { label: 'Variants', key: 'optionsPerQuestion', options: [2, 3, 4, 5, 6].map(n => ({ v: n, l: `${n} Options` })) },
+                      { label: 'Points per Question', key: 'marksPerQuestion', options: [5, 10, 15, 20].map(n => ({ v: n, l: `${n} Points` })) },
                     ].map((cfg) => (
                       <div key={cfg.key} className="space-y-3">
                         <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">{cfg.label}</Label>
-                        <Select 
-                          value={String((aiConfig as any)[cfg.key])} 
-                          onValueChange={(v) => setAiConfig(prev => ({ ...prev, [cfg.key]: isNaN(Number(v)) ? v : parseInt(v) }))}
-                        >
-                          <SelectTrigger className="h-12 rounded-xl bg-secondary/30 border-2 border-border/50 focus:border-accent transition-all font-bold px-4 text-xs uppercase">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-2 border-border/50 glass-card">
-                            {cfg.options.map((o: any) => (
-                              <SelectItem key={o.v} value={String(o.v)} className="font-bold rounded-lg m-1 text-xs">{o.l}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-2">
+                          <Select 
+                            value={cfg.key === 'numberOfQuestions' && isOtherQuantity ? 'other' : String((aiConfig as any)[cfg.key])} 
+                            onValueChange={(v) => {
+                              if (cfg.key === 'numberOfQuestions' && v === 'other') {
+                                setIsOtherQuantity(true);
+                              } else if (cfg.key === 'numberOfQuestions') {
+                                setIsOtherQuantity(false);
+                                setAiConfig(prev => ({ ...prev, [cfg.key]: parseInt(v) }));
+                              } else {
+                                setAiConfig(prev => ({ ...prev, [cfg.key]: isNaN(Number(v)) ? v : parseInt(v) }));
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-12 rounded-xl bg-secondary/30 border-2 border-border/50 focus:border-accent transition-all font-bold px-4 text-xs uppercase">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-2 border-border/50 glass-card">
+                              {cfg.options.map((o: any) => (
+                                <SelectItem key={o.v} value={String(o.v)} className="font-bold rounded-lg m-1 text-xs">{o.l}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {cfg.key === 'numberOfQuestions' && isOtherQuantity && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: -5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                            >
+                              <Input
+                                type="number"
+                                placeholder="Number of questions..."
+                                value={aiConfig.numberOfQuestions}
+                                onChange={(e) => setAiConfig(prev => ({ ...prev, numberOfQuestions: parseInt(e.target.value) || 0 }))}
+                                className="h-10 rounded-xl bg-secondary/30 border-2 border-border/50 focus:border-accent transition-all font-bold text-center text-xs"
+                                min={1}
+                                max={50}
+                              />
+                            </motion.div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center ml-1">
-                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground">Temporal Matrix</Label>
-                      <span className="font-black text-accent text-sm">{Math.floor(aiConfig.timeLimit / 60)}:00 Units</span>
+                     <div className="flex justify-between items-center ml-1">
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground">Time Limit</Label>
+                      <span className="font-black text-accent text-sm">{Math.floor(aiConfig.timeLimit / 60)}:00 Minutes</span>
                     </div>
                     <Slider
                       value={[aiConfig.timeLimit]}
@@ -701,12 +823,12 @@ export default function CreateQuizPage() {
                     {loading ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Synthesizing...
+                        Generating...
                       </>
                     ) : (
                       <>
                         <Wand2 className="w-5 h-5" />
-                        Execute Synthesis
+                        Generate Questions
                       </>
                     )}
                   </Button>
@@ -723,8 +845,8 @@ export default function CreateQuizPage() {
                       <Upload className="w-6 h-6 text-violet-500" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-black tracking-tight uppercase">Source Extraction</CardTitle>
-                      <CardDescription className="font-bold text-muted-foreground">Hydrate assessment logic from raw documentation (PDF)</CardDescription>
+                      <CardTitle className="text-2xl font-black tracking-tight uppercase">PDF to Quiz</CardTitle>
+                      <CardDescription className="font-bold text-muted-foreground">Upload a PDF to generate questions from it.</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -755,21 +877,21 @@ export default function CreateQuizPage() {
                             <div className="w-20 h-20 rounded-3xl bg-violet-100 flex items-center justify-center shadow-lg">
                               <FileText className="w-10 h-10 text-violet-600" />
                             </div>
-                            <div>
+                             <div>
                               <p className="text-xl font-black text-foreground uppercase tracking-tight">{pdfConfig.fileName}</p>
                               <p className="text-xs text-muted-foreground font-bold flex items-center justify-center gap-2 mt-1">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                SOURCE VALIDATED - CLICK TO REPLACE
+                                PDF UPLOADED - CLICK TO REPLACE
                               </p>
                             </div>
                           </div>
                         ) : (
-                          <div className="space-y-4">
+                           <div className="space-y-4">
                             <Upload className="w-16 h-16 text-muted-foreground/20 mx-auto" />
                             <div>
-                              <p className="text-xl font-black text-foreground uppercase tracking-tight">Deposit Source PDF</p>
+                              <p className="text-xl font-black text-foreground uppercase tracking-tight">Upload PDF File</p>
                               <p className="text-sm text-muted-foreground font-bold mt-1 uppercase tracking-widest border-t border-border/50 pt-4 w-fit mx-auto">
-                                MAX PAYLOAD: 10MB
+                                Max size: 10MB
                               </p>
                             </div>
                           </div>
@@ -778,37 +900,113 @@ export default function CreateQuizPage() {
                     </div>
                   </div>
 
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">Subject</Label>
+                      <Select 
+                        value={pdfOtherSubject ? 'other' : pdfConfig.subject || ''} 
+                        onValueChange={(v) => {
+                          if (v === 'other') {
+                            setPdfOtherSubject(true);
+                            setPdfConfig(prev => ({ ...prev, subject: '' }));
+                          } else {
+                            setPdfOtherSubject(false);
+                            setPdfConfig(prev => ({ ...prev, subject: v }));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-violet-500 transition-all font-bold px-6">
+                          <SelectValue placeholder="Select Subject" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border-2 border-border/50 glass-card">
+                          {teacherClasses.map((cls: any) => (
+                            <SelectItem key={cls.id} value={cls.name} className="font-bold rounded-xl m-1">
+                              {cls.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="other" className="font-bold rounded-xl m-1 text-primary border-t border-border/50 mt-2 pt-2">
+                            Other Subject...
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {pdfOtherSubject && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-3"
+                        >
+                          <Input
+                            placeholder="Type subject name..."
+                            value={pdfConfig.subject || ''}
+                            onChange={(e) => setPdfConfig(prev => ({ ...prev, subject: e.target.value }))}
+                            className="h-14 rounded-2xl bg-secondary/30 border-2 border-border/50 focus:border-violet-500 transition-all font-bold px-6 uppercase"
+                          />
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
                     {[
-                      { label: 'Complexity', key: 'difficulty', options: [
-                        { v: 'very_easy', l: 'NEO' }, { v: 'easy', l: 'INIT' }, { v: 'medium', l: 'OPER' }, { v: 'hard', l: 'VET' }, { v: 'very_hard', l: 'ELITE' }
+                      { label: 'Difficulty', key: 'difficulty', options: [
+                        { v: 'very_easy', l: 'Very Easy' }, { v: 'easy', l: 'Easy' }, { v: 'medium', l: 'Medium' }, { v: 'hard', l: 'Hard' }, { v: 'very_hard', l: 'Very Hard' }
                       ]},
-                      { label: 'Quantity', key: 'numberOfQuestions', options: [3, 5, 10, 15, 20].map(n => ({ v: n, l: `${n} Units` })) },
-                      { label: 'Variants', key: 'optionsPerQuestion', options: [2, 3, 4, 5, 6].map(n => ({ v: n, l: `${n} Opt` })) },
-                      { label: 'XP Weight', key: 'marksPerQuestion', options: [5, 10, 15, 20].map(n => ({ v: n, l: `${n} XP` })) },
+                      { label: 'Quantity', key: 'numberOfQuestions', options: [
+                        ...[3, 5, 10, 15, 20].map(n => ({ v: n, l: `${n} Questions` })),
+                        { v: 'other', l: 'Other...' }
+                      ]},
+                      { label: 'Variants', key: 'optionsPerQuestion', options: [2, 3, 4, 5, 6].map(n => ({ v: n, l: `${n} Options` })) },
+                      { label: 'Points per Question', key: 'marksPerQuestion', options: [5, 10, 15, 20].map(n => ({ v: n, l: `${n} Points` })) },
                     ].map((cfg) => (
                       <div key={cfg.key} className="space-y-3">
                         <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground ml-1">{cfg.label}</Label>
-                        <Select 
-                          value={String((pdfConfig as any)[cfg.key])} 
-                          onValueChange={(v) => setPdfConfig(prev => ({ ...prev, [cfg.key]: isNaN(Number(v)) ? v : parseInt(v) }))}
-                        >
-                          <SelectTrigger className="h-12 rounded-xl bg-secondary/30 border-2 border-border/50 focus:border-violet-500 transition-all font-bold px-4 text-xs uppercase">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-2 border-border/50 glass-card">
-                            {cfg.options.map((o: any) => (
-                              <SelectItem key={o.v} value={String(o.v)} className="font-bold rounded-lg m-1 text-xs">{o.l}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-2">
+                          <Select 
+                            value={cfg.key === 'numberOfQuestions' && pdfOtherQuantity ? 'other' : String((pdfConfig as any)[cfg.key])} 
+                            onValueChange={(v) => {
+                              if (cfg.key === 'numberOfQuestions' && v === 'other') {
+                                setPdfOtherQuantity(true);
+                              } else if (cfg.key === 'numberOfQuestions') {
+                                setPdfOtherQuantity(false);
+                                setPdfConfig(prev => ({ ...prev, [cfg.key]: parseInt(v) }));
+                              } else {
+                                setPdfConfig(prev => ({ ...prev, [cfg.key]: isNaN(Number(v)) ? v : parseInt(v) }));
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-12 rounded-xl bg-secondary/30 border-2 border-border/50 focus:border-violet-500 transition-all font-bold px-4 text-xs uppercase">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-2 border-border/50 glass-card">
+                              {cfg.options.map((o: any) => (
+                                <SelectItem key={o.v} value={String(o.v)} className="font-bold rounded-lg m-1 text-xs">{o.l}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {cfg.key === 'numberOfQuestions' && pdfOtherQuantity && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: -5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                            >
+                              <Input
+                                type="number"
+                                placeholder="Number of questions..."
+                                value={pdfConfig.numberOfQuestions}
+                                onChange={(e) => setPdfConfig(prev => ({ ...prev, numberOfQuestions: parseInt(e.target.value) || 0 }))}
+                                className="h-10 rounded-xl bg-secondary/30 border-2 border-border/50 focus:border-violet-500 transition-all font-bold text-center text-xs"
+                                min={1}
+                                max={50}
+                              />
+                            </motion.div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center ml-1">
-                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground">Temporal Matrix</Label>
-                      <span className="font-black text-violet-500 text-sm">{Math.floor(pdfConfig.timeLimit / 60)}:00 Units</span>
+                      <Label className="font-black text-[10px] uppercase tracking-widest text-muted-foreground">Time Limit</Label>
+                      <span className="font-black text-violet-500 text-sm">{Math.floor(pdfConfig.timeLimit / 60)}:00 Minutes</span>
                     </div>
                     <Slider
                       value={[pdfConfig.timeLimit]}
@@ -956,16 +1154,50 @@ export default function CreateQuizPage() {
                 <Target className="w-32 h-32" />
               </div>
               <CardHeader className="p-10 border-b border-border/50">
-                <CardTitle className="text-xl font-black tracking-tight uppercase">Mission Summary</CardTitle>
+                <CardTitle className="text-xl font-black tracking-tight uppercase">Quiz Summary</CardTitle>
               </CardHeader>
               <CardContent className="p-10 space-y-8">
                 <div className="space-y-4">
                   {[
-                    { label: 'Deployment Status', value: <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[10px] uppercase">Draft</Badge> },
-                    { label: 'Active Vectors', value: `${generatedQuiz ? generatedQuiz.questions.length : questions.length} Units` },
-                    { label: 'Net XP Reward', value: `${generatedQuiz ? generatedQuiz.totalMarks : questions.reduce((sum: number, q: QuizQuestion) => sum + q.marks, 0)} XP`, highlighted: true },
-                    { label: 'Temporal Limit', value: <div className="flex items-center gap-2 font-black"><Clock className="w-4 h-4 text-muted-foreground" /> {Math.floor((generatedQuiz?.timeLimit || timeLimit) / 60)}:00</div> },
-                    { label: 'Difficulty Grade', value: <Badge variant="outline" className="font-black text-[10px] uppercase bg-secondary/50 border-border/50">{(generatedQuiz?.difficulty || difficulty).replace('_', ' ')}</Badge> },
+                    { label: 'Status', value: <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[10px] uppercase">{generatedQuiz ? 'Ready' : 'Draft'}</Badge> },
+                    { 
+                      label: 'Total Questions', 
+                      value: `${generatedQuiz 
+                        ? generatedQuiz.questions.length 
+                        : creationMethod === 'manual' 
+                          ? questions.length 
+                          : creationMethod === 'ai_topic' 
+                            ? aiConfig.numberOfQuestions 
+                            : pdfConfig.numberOfQuestions} Questions` 
+                    },
+                    { 
+                      label: 'Total Points', 
+                      value: `${generatedQuiz 
+                        ? generatedQuiz.totalMarks 
+                        : creationMethod === 'manual' 
+                          ? questions.reduce((sum, q) => sum + q.marks, 0)
+                          : creationMethod === 'ai_topic' 
+                            ? aiConfig.numberOfQuestions * aiConfig.marksPerQuestion
+                            : pdfConfig.numberOfQuestions * pdfConfig.marksPerQuestion} Points`, 
+                      highlighted: true 
+                    },
+                    { 
+                      label: 'Time Limit', 
+                      value: (
+                        <div className="flex items-center gap-2 font-black">
+                          <Clock className="w-4 h-4 text-muted-foreground" /> 
+                          {Math.floor((generatedQuiz?.timeLimit || (creationMethod === 'manual' ? timeLimit : creationMethod === 'ai_topic' ? aiConfig.timeLimit : pdfConfig.timeLimit)) / 60)}:00
+                        </div>
+                      ) 
+                    },
+                    { 
+                      label: 'Difficulty', 
+                      value: (
+                        <Badge variant="outline" className="font-black text-[10px] uppercase bg-secondary/50 border-border/50">
+                          {(generatedQuiz?.difficulty || (creationMethod === 'manual' ? difficulty : creationMethod === 'ai_topic' ? aiConfig.difficulty : pdfConfig.difficulty)).replace('_', ' ')}
+                        </Badge>
+                      ) 
+                    },
                   ].map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center group">
                       <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">{item.label}</span>

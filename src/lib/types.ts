@@ -29,6 +29,8 @@ export interface Class {
   teacherId: string;
   studentIds: string[];
   quizIds: string[];
+  studentCount?: number;
+  quizCount?: number;
   createdAt: Date;
 }
 
@@ -61,6 +63,7 @@ export interface Quiz {
   maxAttempts: number;
   deadline?: Date;
   isPublished: boolean;
+  questionCount?: number;
   createdAt: Date;
   subject: string;
   topic: string;
@@ -143,6 +146,7 @@ export interface AIQuizConfig {
 export interface PDFQuizConfig {
   fileName: string;
   fileContent: string;
+  subject: string;
   difficulty: Difficulty;
   numberOfQuestions: number;
   optionsPerQuestion: number;

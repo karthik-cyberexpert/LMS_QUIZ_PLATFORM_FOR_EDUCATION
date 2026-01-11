@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { generateTeacherAnalytics, MOCK_STUDENTS } from '@/lib/mock-data';
 import {
   BarChart3,
   TrendingUp,
@@ -42,28 +41,32 @@ export default function TeacherAnalyticsPage() {
   const [selectedQuiz, setSelectedQuiz] = useState('');
 
   const classQuizzes = quizzes.filter(q => q.classId === selectedClass);
-  const analytics = selectedClass ? generateTeacherAnalytics(selectedClass) : null;
-
   const classAttempts = attempts.filter(a => classQuizzes.some(q => q.id === a.quizId));
   const flaggedAttempts = classAttempts.filter(a => a.isFlagged);
+  
   const avgAccuracy = classAttempts.length > 0
     ? Math.round(classAttempts.reduce((sum, a) => sum + a.accuracy, 0) / classAttempts.length)
     : 0;
+  
   const avgTime = classAttempts.length > 0
     ? Math.round(classAttempts.reduce((sum, a) => sum + a.timeTaken, 0) / classAttempts.length / 60)
     : 0;
 
-  const difficultyData = analytics?.difficultyVsPerformance.map(d => ({
-    name: d.difficulty.replace('_', ' ').charAt(0).toUpperCase() + d.difficulty.replace('_', ' ').slice(1),
-    score: d.averageScore,
-    time: Math.round(d.averageTime / 60),
-  })) || [];
+  // Simplified chart data based on real attempts
+  const difficultyData = ['easy', 'medium', 'hard'].map(diff => {
+    const diffAttempts = classAttempts.filter(a => {
+      const q = quizzes.find(quiz => quiz.id === a.quizId);
+      return q?.difficulty === diff;
+    });
+    return {
+      name: diff.charAt(0).toUpperCase() + diff.slice(1),
+      score: diffAttempts.length > 0 
+        ? Math.round(diffAttempts.reduce((sum, a) => sum + a.accuracy, 0) / diffAttempts.length)
+        : 0
+    };
+  });
 
-  const questionData = analytics?.questionStats.map((q, i) => ({
-    name: `Q${i + 1}`,
-    failureRate: Math.round(q.failureRate * 100),
-    avgTime: q.averageTime,
-  })) || [];
+  const questionData: any[] = []; // Question-level analytics will be implemented in the next phase
 
   const performanceDistribution = [
     { name: 'Excellent (80-100%)', value: classAttempts.filter(a => a.accuracy >= 80).length, color: '#10b981' },
@@ -263,35 +266,13 @@ export default function TeacherAnalyticsPage() {
         <TabsContent value="students" className="space-y-6">
           <Card className="border-0 shadow-lg shadow-slate-200/50">
             <CardHeader>
-              <CardTitle>Student Performance</CardTitle>
-              <CardDescription>Individual student metrics</CardDescription>
+              <CardTitle>Student Progress</CardTitle>
+              <CardDescription>Aggregate metrics from attempts</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {analytics?.studentPerformance.map((student) => {
-                  const studentData = MOCK_STUDENTS.find(s => s.id === student.studentId);
-                  return (
-                    <div key={student.studentId} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{studentData?.name || 'Unknown'}</p>
-                        <p className="text-sm text-slate-500">{student.quizzesCompleted} quizzes completed</p>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-lg font-bold ${
-                          student.averageScore >= 80 ? 'text-emerald-600' :
-                          student.averageScore >= 60 ? 'text-amber-600' : 'text-rose-600'
-                        }`}>
-                          {student.averageScore}%
-                        </div>
-                        <p className="text-xs text-slate-500">Avg Score</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-violet-600">{student.totalXP}</div>
-                        <p className="text-xs text-slate-500">Total XP</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="text-center py-8 text-slate-500">
+                <Users className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                <p>Individual student analytics are being migrated to the new system.</p>
               </div>
             </CardContent>
           </Card>
@@ -317,12 +298,11 @@ export default function TeacherAnalyticsPage() {
                 <div className="space-y-4">
                   {flaggedAttempts.map((attempt) => {
                     const quiz = quizzes.find(q => q.id === attempt.quizId);
-                    const student = MOCK_STUDENTS.find(s => s.id === attempt.studentId);
                     return (
                       <div key={attempt.id} className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
                         <div className="flex items-start justify-between">
                           <div>
-                            <p className="font-medium text-slate-900">{student?.name}</p>
+                            <p className="font-medium text-slate-900">Student ID: {attempt.studentId}</p>
                             <p className="text-sm text-slate-600">{quiz?.title}</p>
                             <p className="text-sm text-amber-700 mt-2">{attempt.flagReason}</p>
                           </div>

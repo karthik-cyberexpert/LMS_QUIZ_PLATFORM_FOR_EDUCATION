@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
   Edit,
   Trash2,
   Brain,
+  TrendingUp,
   FileText,
 } from 'lucide-react';
 import {
@@ -27,11 +29,11 @@ import {
 
 export default function TeacherQuizzesPage() {
   const { getTeacherClasses, quizzes, attempts, deleteQuiz, updateQuiz } = useAuth();
-  const teacherClasses = getTeacherClasses();
-  const teacherQuizzes = quizzes.filter(q => teacherClasses.some(c => c.id === q.classId));
+  const teacherClasses = useMemo(() => getTeacherClasses(), [getTeacherClasses]);
+  const teacherQuizzes = useMemo(() => quizzes.filter((q: any) => teacherClasses.some((c: any) => c.id === q.classId)), [quizzes, teacherClasses]);
 
-  const getClassById = (classId: string) => teacherClasses.find(c => c.id === classId);
-  const getAttemptCount = (quizId: string) => attempts.filter(a => a.quizId === quizId).length;
+  const getClassById = (classId: string) => teacherClasses.find((c: any) => c.id === classId);
+  const getAttemptCount = (quizId: string) => attempts.filter((a: any) => a.quizId === quizId).length;
 
   const getCreationMethodIcon = (method: string) => {
     switch (method) {
@@ -76,7 +78,7 @@ export default function TeacherQuizzesPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {teacherQuizzes.map((quiz) => {
+          {teacherQuizzes.map((quiz: any) => {
             const cls = getClassById(quiz.classId);
             const attemptCount = getAttemptCount(quiz.id);
             
@@ -106,7 +108,7 @@ export default function TeacherQuizzesPage() {
                       <div className="flex items-center gap-6 mt-3 text-sm text-slate-600">
                         <span className="flex items-center gap-1">
                           <FileQuestion className="w-4 h-4" />
-                          {quiz.questions.length} questions
+                          {quiz.questionCount ?? quiz.questions?.length ?? 0} questions
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
@@ -132,13 +134,23 @@ export default function TeacherQuizzesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Preview
+                        <DropdownMenuItem asChild>
+                          <Link href={`/student/quiz/${quiz.id}`} target="_blank">
+                            <Eye className="w-4 h-4 mr-2" />
+                            Preview
+                          </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit
+                        <DropdownMenuItem asChild>
+                          <Link href={`/teacher/quizzes/${quiz.id}`}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/teacher/quizzes/${quiz.id}/reports`}>
+                            <TrendingUp className="w-4 h-4 mr-2" />
+                            Reports
+                          </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleTogglePublish(quiz)}>
                           {quiz.isPublished ? 'Unpublish' : 'Publish'}

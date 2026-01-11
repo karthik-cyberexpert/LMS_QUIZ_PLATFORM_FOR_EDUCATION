@@ -27,7 +27,7 @@ import {
   calculateXP,
   detectAnomalousAttempt,
 } from '@/lib/mock-data';
-import { QuizAttempt, Warning, XPBreakdown, PRAISE_CATEGORIES, CORE_BADGES } from '@/lib/types';
+import { QuizAttempt, QuizQuestion, QuizOption, Warning, XPBreakdown, PRAISE_CATEGORIES, CORE_BADGES } from '@/lib/types';
 import {
   Clock,
   AlertTriangle,
@@ -47,6 +47,7 @@ import {
   Zap,
   Info,
   FileText,
+  Loader2,
 } from 'lucide-react';
 
 export default function QuizPage() {
@@ -55,9 +56,41 @@ export default function QuizPage() {
   const { user, quizzes, attempts, addAttempt, updateUserXP, addBadge, addAuditLog, getStudentAttempts } = useAuth();
   const router = useRouter();
 
-  const quiz = quizzes.find(q => q.id === quizId);
+  const [fullQuiz, setFullQuiz] = useState<any>(null);
+  const [fetchingQuiz, setFetchingQuiz] = useState(true);
+  
+  const quizFromContext = quizzes.find(q => q.id === quizId);
   const existingAttempts = user ? getStudentAttempts(user.id, quizId) : [];
   const attemptNumber = existingAttempts.length + 1;
+
+  useEffect(() => {
+    const fetchFullQuiz = async () => {
+      if (quizId) {
+        // If we have questions in context, use it. Otherwise fetch.
+        if (quizFromContext?.questions && quizFromContext.questions.length > 0) {
+          setFullQuiz(quizFromContext);
+          setFetchingQuiz(false);
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/quizzes/${quizId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setFullQuiz(data.quiz);
+          }
+        } catch (error) {
+          console.error('Error fetching quiz details:', error);
+        } finally {
+          setFetchingQuiz(false);
+        }
+      }
+    };
+    fetchFullQuiz();
+  }, [quizId, quizFromContext]);
+
+  // Use fullQuiz if available, otherwise fallback to context (metadata)
+  const quiz = fullQuiz || quizFromContext;
 
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -103,16 +136,16 @@ export default function QuizPage() {
     let score = 0;
     let correctCount = 0;
 
-    quiz.questions.forEach(q => {
+    (quiz.questions || []).forEach((q: QuizQuestion) => {
       const selectedOptionId = answers[q.id];
-      const correctOption = q.options.find(o => o.isCorrect);
+      const correctOption = q.options.find((o: QuizOption) => o.isCorrect);
       if (selectedOptionId === correctOption?.id) {
         score += q.marks;
         correctCount++;
       }
     });
 
-    const accuracy = Math.round((correctCount / quiz.questions.length) * 100);
+    const accuracy = Math.round((correctCount / (quiz.questions?.length || 1)) * 100);
     const xpBreakdown = calculateXP(score, quiz.totalMarks, timeTaken, quiz.timeLimit, quiz.difficulty, attemptNumber);
 
     const attempt: QuizAttempt = {
@@ -178,7 +211,7 @@ export default function QuizPage() {
     if (!started || completed) return;
 
     timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
+      setTimeRemaining((prev: number) => {
         if (prev <= 1) {
           setIsAutoSubmit(true);
           submitQuiz(true);
@@ -284,12 +317,12 @@ export default function QuizPage() {
   const startQuiz = () => {
     if (!quiz) return;
 
-    const shuffledQuestionIds = shuffleArray(quiz.questions.map(q => q.id));
+    const shuffledQuestionIds = shuffleArray((quiz.questions || []).map(q => q.id)) as string[];
     setQuestionOrder(shuffledQuestionIds);
 
     const shuffledOptions: Record<string, string[]> = {};
-    quiz.questions.forEach(q => {
-      shuffledOptions[q.id] = shuffleArray(q.options.map(o => o.id));
+    (quiz.questions || []).forEach((q: QuizQuestion) => {
+      shuffledOptions[q.id] = shuffleArray(q.options.map((o: QuizOption) => o.id)) as string[];
     });
     setOptionOrders(shuffledOptions);
 
@@ -318,7 +351,18 @@ export default function QuizPage() {
     return PRAISE_CATEGORIES.improvement[Math.floor(Math.random() * PRAISE_CATEGORIES.improvement.length)];
   };
 
-  if (!quiz) {
+  if (fetchingQuiz) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
+          <p className="font-black text-muted-foreground uppercase tracking-widest text-xs">Loading Quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!quiz || (started && (!quiz.questions || quiz.questions.length === 0))) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-background">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
@@ -326,13 +370,13 @@ export default function QuizPage() {
             <div className="w-20 h-20 rounded-3xl bg-rose-500/10 flex items-center justify-center mx-auto mb-6">
               <AlertTriangle className="w-10 h-10 text-rose-500" />
             </div>
-            <h2 className="text-3xl font-black mb-2 text-foreground">Unit Not Found</h2>
-            <p className="text-muted-foreground font-medium mb-8">This assessment module has been decoupled or access has been restricted.</p>
+            <h2 className="text-3xl font-black mb-2 text-foreground">Quiz Not Found</h2>
+            <p className="text-muted-foreground font-medium mb-8">This quiz cannot be found or you don't have access.</p>
             <Button 
               onClick={() => router.push('/student')}
               className="w-full h-12 rounded-xl bg-primary font-bold shadow-lg shadow-primary/20"
             >
-              Back to Command Center
+              Back to Dashboard
             </Button>
           </Card>
         </motion.div>
@@ -348,8 +392,8 @@ export default function QuizPage() {
             <div className="w-20 h-20 rounded-3xl bg-amber-500/10 flex items-center justify-center mx-auto mb-6">
               <XCircle className="w-10 h-10 text-amber-500" />
             </div>
-            <h2 className="text-3xl font-black mb-2 text-foreground">Quota Exceeded</h2>
-            <p className="text-muted-foreground font-medium mb-8">You have reached the maximum operational capacity of {quiz.maxAttempts} attempts for this unit.</p>
+            <h2 className="text-3xl font-black mb-2 text-foreground">No More Attempts</h2>
+            <p className="text-muted-foreground font-medium mb-8">You have reached the maximum of {quiz.maxAttempts} attempts for this quiz.</p>
             <Button 
               onClick={() => router.push('/student')}
               className="w-full h-12 rounded-xl bg-foreground font-bold"
@@ -409,10 +453,10 @@ export default function QuizPage() {
               </motion.div>
 
               <Badge className="mb-4 bg-foreground/5 text-foreground border-none font-black text-xs uppercase tracking-[0.2em] px-3 py-1">
-                Mission Accomplished
+                Quiz Completed
               </Badge>
               <h1 className="text-5xl font-black mb-3 text-foreground tracking-tight">{getPraiseMessage(result.attempt.accuracy)}</h1>
-              <p className="text-muted-foreground font-bold text-lg">Unit {quiz.title} Synchronized</p>
+              <p className="text-muted-foreground font-bold text-lg">Quiz {quiz.title} Finished</p>
             </div>
 
             <CardContent className="p-10 space-y-10">
@@ -438,29 +482,29 @@ export default function QuizPage() {
                     <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
                       <Zap className="w-5 h-5 text-amber-600" />
                     </div>
-                    <span className="font-black text-amber-900 uppercase tracking-tight text-sm">Experience Rewards</span>
+                    <span className="font-black text-amber-900 uppercase tracking-tight text-sm">Points Earned</span>
                   </div>
                   <div className="text-4xl font-black text-amber-600">
-                    +{result.xpBreakdown.finalXP}<span className="text-sm ml-1 uppercase">XP</span>
+                    +{result.xpBreakdown.finalXP}<span className="text-sm ml-1 uppercase">Points</span>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-x-12 gap-y-4 relative z-10">
                   <div className="flex justify-between items-center py-2 border-b border-amber-500/10">
-                    <span className="text-sm font-bold text-amber-800/60 uppercase tracking-wider text-[10px]">Precision Bonus</span>
-                    <span className="font-black text-amber-900">{result.xpBreakdown.accuracyXP} <span className="text-[10px]">XP</span></span>
+                    <span className="text-sm font-bold text-amber-800/60 uppercase tracking-wider text-[10px]">Accuracy Points</span>
+                    <span className="font-black text-amber-900">{result.xpBreakdown.accuracyXP} <span className="text-[10px]">Points</span></span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-amber-500/10">
-                    <span className="text-sm font-bold text-amber-800/60 uppercase tracking-wider text-[10px]">Velocity Core</span>
-                    <span className="font-black text-amber-900">{result.xpBreakdown.speedXP} <span className="text-[10px]">XP</span></span>
+                    <span className="text-sm font-bold text-amber-800/60 uppercase tracking-wider text-[10px]">Speed Points</span>
+                    <span className="font-black text-amber-900">{result.xpBreakdown.speedXP} <span className="text-[10px]">Points</span></span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-amber-500/10">
-                    <span className="text-sm font-bold text-amber-800/60 uppercase tracking-wider text-[10px]">Complexity Level</span>
+                    <span className="text-sm font-bold text-amber-800/60 uppercase tracking-wider text-[10px]">Difficulty</span>
                     <span className="font-black text-amber-900">{result.xpBreakdown.difficultyMultiplier}x</span>
                   </div>
                   {result.xpBreakdown.retryPenalty < 1 && (
                     <div className="flex justify-between items-center py-2 border-b border-amber-500/10">
-                      <span className="text-sm font-bold text-rose-800/60 uppercase tracking-wider text-[10px]">Efficiency Adjustment</span>
+                      <span className="text-sm font-bold text-rose-800/60 uppercase tracking-wider text-[10px]">Retry Penalty</span>
                       <span className="font-black text-rose-600">-{Math.round((1 - result.xpBreakdown.retryPenalty) * 100)}%</span>
                     </div>
                   )}
@@ -473,9 +517,9 @@ export default function QuizPage() {
                     <AlertTriangle className="w-6 h-6 text-rose-600" />
                   </div>
                   <div>
-                    <h4 className="font-black text-rose-900 uppercase tracking-tight text-sm">Integrity Alert Detected</h4>
+                    <h4 className="font-black text-rose-900 uppercase tracking-tight text-sm">Warning Detected</h4>
                     <p className="text-rose-800/80 font-bold text-sm mt-1 leading-relaxed">{result.attempt.flagReason}</p>
-                    <p className="text-rose-600/60 text-[10px] uppercase font-black tracking-widest mt-4">Manual Oversight Initiated</p>
+                    <p className="text-rose-600/60 text-[10px] uppercase font-black tracking-widest mt-4">Teacher Notified</p>
                   </div>
                 </div>
               )}
@@ -487,7 +531,7 @@ export default function QuizPage() {
                   onClick={() => router.push('/student')}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Command Center
+                  Dashboard
                 </Button>
                 {attemptNumber < quiz.maxAttempts && (
                   <Button 
@@ -504,7 +548,7 @@ export default function QuizPage() {
                       setTimeRemaining(quiz.timeLimit);
                     }}
                   >
-                    Re-Initalize Unit
+                    Try Again
                     <Zap className="w-4 h-4 ml-2" />
                   </Button>
                 )}
@@ -555,14 +599,14 @@ export default function QuizPage() {
                     <Clock className="w-5 h-5 text-primary" />
                   </div>
                   <div className="text-2xl font-black text-foreground">{Math.floor(quiz.timeLimit / 60)}m</div>
-                  <div className="text-xs font-black text-muted-foreground uppercase mt-1 tracking-widest">Temporal Limit</div>
+                  <div className="text-xs font-black text-muted-foreground uppercase mt-1 tracking-widest">Time Limit</div>
                 </div>
                 <div className="p-6 rounded-[2rem] bg-secondary/30 border border-border/50 text-center group hover:border-accent/50 transition-colors">
                   <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
                     <FileText className="w-5 h-5 text-accent" />
                   </div>
-                  <div className="text-2xl font-black text-foreground">{quiz.questions.length} Units</div>
-                  <div className="text-xs font-black text-muted-foreground uppercase mt-1 tracking-widest">Complexity</div>
+                  <div className="text-2xl font-black text-foreground">{quiz.questions?.length || 0}</div>
+                  <div className="text-xs font-black text-muted-foreground uppercase mt-1 tracking-widest">Questions</div>
                 </div>
               </div>
 
@@ -572,12 +616,12 @@ export default function QuizPage() {
                     <Zap className="w-5 h-5 text-amber-600" />
                   </div>
                   <div>
-                    <h4 className="font-black text-amber-900 uppercase tracking-tight text-sm">Security Protocols Active</h4>
+                    <h4 className="font-black text-amber-900 uppercase tracking-tight text-sm">Security Active</h4>
                     <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-xs font-bold text-amber-800/80 mt-3">
-                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-amber-500" /> Tab Switch Detection</li>
-                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-amber-500" /> Right-Click Restriction</li>
-                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-amber-500" /> Session Anomaly Logging</li>
-                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-amber-500" /> Dynamic Randomization</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-amber-500" /> Tab Switch Warning</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-amber-500" /> No Right-Clicking</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-amber-500" /> Activity Logging</li>
+                      <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-amber-500" /> Random Questions</li>
                     </ul>
                   </div>
                 </div>
@@ -604,7 +648,7 @@ export default function QuizPage() {
                 >
                   <Eye className="w-6 h-6" />
                 </motion.div>
-                Initialize Mission
+                Start Quiz
                 <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
               </Button>
             </CardContent>
@@ -615,10 +659,10 @@ export default function QuizPage() {
   }
 
   const currentQuestionId = questionOrder[currentQuestion];
-  const currentQuestionData = quiz.questions.find(q => q.id === currentQuestionId);
+  const currentQuestionData = quiz.questions?.find((q: QuizQuestion) => q.id === currentQuestionId);
   const currentOptions = currentQuestionData ? optionOrders[currentQuestionData.id] || [] : [];
   const answeredCount = Object.keys(answers).length;
-  const progressPercent = (answeredCount / quiz.questions.length) * 100;
+  const progressPercent = (answeredCount / (quiz.questions?.length || 1)) * 100;
 
   return (
     <div className="min-h-screen bg-background select-none font-sans">
@@ -636,7 +680,7 @@ export default function QuizPage() {
                 <Shield className="w-5 h-5 text-primary" />
               </div>
               <div className="hidden sm:block">
-                <h2 className="text-sm font-black text-foreground/40 uppercase tracking-[0.2em]">Live Assessment</h2>
+                <h2 className="text-sm font-black text-foreground/40 uppercase tracking-[0.2em]">Quiz in Progress</h2>
                 <h3 className="text-lg font-black text-foreground tracking-tight leading-none mt-1">{quiz.title}</h3>
               </div>
             </div>
@@ -649,7 +693,7 @@ export default function QuizPage() {
                 >
                   <Badge variant="destructive" className="gap-2 px-3 py-1.5 rounded-lg font-black bg-rose-500/10 text-rose-500 border-none">
                     <AlertTriangle className="w-4 h-4" />
-                    {warnings.length} <span className="hidden xs:inline">STATUS: COMPROMISED</span>
+                    {warnings.length} <span className="hidden xs:inline">WARNING DETECTED</span>
                   </Badge>
                 </motion.div>
               )}
@@ -669,8 +713,8 @@ export default function QuizPage() {
 
           <div className="mt-6 relative">
             <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-muted-foreground/60">
-              <span>Synchronization: {answeredCount} / {quiz.questions.length} Units</span>
-              <span>Vector {currentQuestion + 1}</span>
+              <span>Progress: {answeredCount} / {quiz.questions?.length || 0} Questions</span>
+              <span>Question {currentQuestion + 1}</span>
             </div>
             <div className="h-1.5 w-full bg-secondary/50 rounded-full overflow-hidden">
               <motion.div 
@@ -721,7 +765,7 @@ export default function QuizPage() {
                     className="grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     {currentOptions.map((optionId, index) => {
-                      const option = currentQuestionData.options.find(o => o.id === optionId);
+                      const option = currentQuestionData.options.find((o: QuizOption) => o.id === optionId);
                       if (!option) return null;
                       const isSelected = answers[currentQuestionData.id] === optionId;
                       
@@ -780,7 +824,7 @@ export default function QuizPage() {
             </Button>
 
             <div className="hidden md:flex gap-2 p-2 bg-secondary/50 backdrop-blur-xl rounded-[2rem] border border-border/50">
-              {quiz.questions.map((_, index) => (
+              {(quiz.questions || []).map((_: any, index: number) => (
                 <button
                   key={index}
                   onClick={() => setCurrentQuestion(index)}
@@ -806,14 +850,14 @@ export default function QuizPage() {
                 className="h-14 rounded-2xl px-10 bg-primary hover:scale-[1.05] active:scale-95 transition-all shadow-xl shadow-primary/20 font-black uppercase text-xs tracking-widest gap-2"
               >
                 <Send className="w-4 h-4" />
-                Submit Sync
+                Submit Quiz
               </Button>
             ) : (
               <Button
                 onClick={() => setCurrentQuestion(prev => Math.min(quiz.questions.length - 1, prev + 1))}
                 className="h-14 rounded-2xl px-10 bg-foreground text-background hover:scale-[1.05] active:scale-95 transition-all font-black uppercase text-xs tracking-widest gap-2"
               >
-                Next Step
+                Next
                 <ChevronRight className="w-4 h-4" />
               </Button>
             )}
@@ -828,7 +872,7 @@ export default function QuizPage() {
               <div className="w-12 h-12 rounded-2xl bg-rose-500/20 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-6 h-6 text-rose-500" />
               </div>
-              Security Breach Detected
+              Warning Detected
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground font-bold text-lg mt-4 leading-relaxed">
               {warningMessage}
@@ -843,20 +887,20 @@ export default function QuizPage() {
       <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
         <AlertDialogContent className="glass-card border-none rounded-[3rem] p-10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-3xl font-black tracking-tight">Finalize Synchronization?</AlertDialogTitle>
+            <AlertDialogTitle className="text-3xl font-black tracking-tight">Finish Quiz?</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground font-bold text-lg mt-4 leading-relaxed">
-              You&apos;ve answered {answeredCount} of {quiz.questions.length} objective units.
+              You&apos;ve answered {answeredCount} of {quiz.questions.length} questions.
               {answeredCount < quiz.questions.length && (
                 <span className="block mt-4 p-4 rounded-2xl bg-rose-500/10 text-rose-600 border border-rose-500/20">
-                  CRITICAL: {quiz.questions.length - answeredCount} units remain unmapped. Proceeding may result in operational inefficiency.
+                  WARNING: {quiz.questions.length - answeredCount} questions are not answered yet.
                 </span>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-10 gap-3">
-            <AlertDialogCancel className="h-14 rounded-2xl font-black uppercase text-xs tracking-widest border-2 border-border/50">Abort</AlertDialogCancel>
+            <AlertDialogCancel className="h-14 rounded-2xl font-black uppercase text-xs tracking-widest border-2 border-border/50">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => submitQuiz(false)} className="h-14 rounded-2xl bg-primary font-black uppercase text-xs tracking-widest px-8 shadow-xl shadow-primary/20">
-              Submit Command
+              Confirm Submit
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

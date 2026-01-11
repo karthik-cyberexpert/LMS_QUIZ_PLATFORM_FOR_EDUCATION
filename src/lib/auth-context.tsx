@@ -1,15 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { User, Class, Quiz, QuizAttempt, AuditLog, Badge } from './types';
-import {
-  MOCK_TEACHERS,
-  MOCK_STUDENTS,
-  MOCK_CLASSES,
-  MOCK_QUIZZES,
-  MOCK_ATTEMPTS,
-  MOCK_AUDIT_LOGS,
-} from './mock-data';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
@@ -22,7 +15,7 @@ interface AuthContextType {
   attempts: QuizAttempt[];
   auditLogs: AuditLog[];
   addClass: (newClass: Omit<Class, 'id' | 'createdAt' | 'studentIds' | 'quizIds'>) => void;
-  joinClass: (inviteCode: string) => boolean;
+  joinClass: (inviteCode: string) => Promise<boolean>;
   addQuiz: (quiz: Quiz) => void;
   updateQuiz: (quiz: Quiz) => void;
   deleteQuiz: (quizId: string) => void;
@@ -31,118 +24,288 @@ interface AuthContextType {
   addBadge: (badge: Badge) => void;
   addAuditLog: (log: Omit<AuditLog, 'id' | 'timestamp'>) => void;
   getStudentAttempts: (studentId: string, quizId: string) => QuizAttempt[];
-  getClassStudents: (classId: string) => User[];
+  getClassStudents: (classId: string) => Promise<User[]>;
   getTeacherClasses: () => Class[];
   getStudentClasses: () => Class[];
+  fetchQuizAttempts: (quizId: string) => Promise<any[]>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [classes, setClasses] = useState<Class[]>(MOCK_CLASSES);
-  const [quizzes, setQuizzes] = useState<Quiz[]>(MOCK_QUIZZES);
-  const [attempts, setAttempts] = useState<QuizAttempt[]>(MOCK_ATTEMPTS);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(MOCK_AUDIT_LOGS);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const login = useCallback(async (email: string, _password: string): Promise<boolean> => {
-    
-    const teacher = MOCK_TEACHERS.find((t) => t.email === email);
-    if (teacher) {
-      setUser(teacher);
-      return true;
+  const TIMEOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+
+  // Handle Session Persistence & Inactivity
+  useEffect(() => {
+    const savedUser = localStorage.getItem('quizmaster_session');
+    const lastActivity = localStorage.getItem('quizmaster_last_activity');
+
+    if (savedUser && lastActivity) {
+      const timeInactivity = Date.now() - parseInt(lastActivity);
+      if (timeInactivity < TIMEOUT_DURATION) {
+        setUser(JSON.parse(savedUser));
+        localStorage.setItem('quizmaster_last_activity', Date.now().toString());
+      } else {
+        localStorage.removeItem('quizmaster_session');
+        localStorage.removeItem('quizmaster_last_activity');
+      }
     }
+    setLoading(false);
+  }, []);
 
-    const student = MOCK_STUDENTS.find((s) => s.email === email);
-    if (student) {
-      setUser(student);
-      return true;
+  // Sync session to localStorage
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('quizmaster_session', JSON.stringify(user));
+      localStorage.setItem('quizmaster_last_activity', Date.now().toString());
+    } else {
+      localStorage.removeItem('quizmaster_session');
+      localStorage.removeItem('quizmaster_last_activity');
     }
+  }, [user]);
 
-    return false;
+  // Inactivity Monitor
+  useEffect(() => {
+    if (!user) return;
+
+    const updateActivity = () => {
+      localStorage.setItem('quizmaster_last_activity', Date.now().toString());
+    };
+
+    const checkInactivity = () => {
+      const lastActivity = localStorage.getItem('quizmaster_last_activity');
+      if (lastActivity) {
+        const timeInactivity = Date.now() - parseInt(lastActivity);
+        if (timeInactivity >= TIMEOUT_DURATION) {
+          logout();
+          toast.error('Session expired due to inactivity');
+        }
+      }
+    };
+
+    window.addEventListener('mousedown', updateActivity);
+    window.addEventListener('keydown', updateActivity);
+    window.addEventListener('click', updateActivity);
+
+    const interval = setInterval(checkInactivity, 60000); // Check every minute
+
+    return () => {
+      window.removeEventListener('mousedown', updateActivity);
+      window.removeEventListener('keydown', updateActivity);
+      window.removeEventListener('click', updateActivity);
+      clearInterval(interval);
+    };
+  }, [user]);
+
+  // Hydrate data on login
+  useEffect(() => {
+    if (user) {
+      const fetchData = async () => {
+        try {
+          // Fetch Classes
+          const classUrl = user.role === 'teacher' 
+            ? `/api/classes?teacherId=${user.id}` 
+            : `/api/classes?studentId=${user.id}`;
+          const classesRes = await fetch(classUrl);
+          const classesData = await classesRes.json();
+          setClasses(classesData.classes || []);
+
+          // Fetch Quizzes
+          const quizUrl = user.role === 'teacher'
+            ? `/api/quizzes?teacherId=${user.id}`
+            : `/api/quizzes?studentId=${user.id}`; 
+          
+          if (quizUrl) {
+            const quizzesRes = await fetch(quizUrl);
+            const quizzesData = await quizzesRes.json();
+            setQuizzes(quizzesData.quizzes || []);
+          }
+
+          // Fetch Attempts
+          if (user.role === 'student') {
+            const attemptsRes = await fetch(`/api/attempts?studentId=${user.id}`);
+            const attemptsData = await attemptsRes.json();
+            setAttempts(attemptsData.attempts || []);
+          }
+        } catch (error) {
+          console.error('Data hydration error:', error);
+        }
+      };
+      fetchData();
+    }
+  }, [user]);
+
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      setUser(data.user);
+      return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    }
   }, []);
 
   const register = useCallback(
-    async (name: string, email: string, _password: string, role: 'teacher' | 'student'): Promise<boolean> => {
+    async (name: string, email: string, password: string, role: 'teacher' | 'student'): Promise<boolean> => {
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password, role }),
+        });
 
-      const newUser: User = {
-        id: `${role}-${Date.now()}`,
-        email,
-        name,
-        role,
-        createdAt: new Date(),
-        totalXP: 0,
-        badges: [],
-      };
+        if (!response.ok) return false;
 
-      setUser(newUser);
-      return true;
+        const data = await response.json();
+        setUser(data.user);
+        return true;
+      } catch (error) {
+        console.error('Registration error:', error);
+        return false;
+      }
     },
     []
   );
 
   const logout = useCallback(() => {
     setUser(null);
+    setClasses([]);
+    setQuizzes([]);
+    setAttempts([]);
+    localStorage.removeItem('quizmaster_session');
+    localStorage.removeItem('quizmaster_last_activity');
   }, []);
 
   const addClass = useCallback(
-    (newClass: Omit<Class, 'id' | 'createdAt' | 'studentIds' | 'quizIds'>) => {
-      const classToAdd: Class = {
-        ...newClass,
-        id: `class-${Date.now()}`,
-        createdAt: new Date(),
-        studentIds: [],
-        quizIds: [],
-      };
-      setClasses((prev) => [...prev, classToAdd]);
+    async (newClass: Omit<Class, 'id' | 'createdAt' | 'studentIds' | 'quizIds'>) => {
+      try {
+        const response = await fetch('/api/classes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...newClass, teacherId: user?.id }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setClasses((prev) => [...prev, data.class]);
+          toast.success('Class created successfully');
+        }
+      } catch (error) {
+        console.error('Add class error:', error);
+      }
     },
-    []
+    [user]
   );
 
   const joinClass = useCallback(
-    (inviteCode: string): boolean => {
+    async (inviteCode: string): Promise<boolean> => {
       if (!user || user.role !== 'student') return false;
-
-      const classToJoin = classes.find((c) => c.inviteCode === inviteCode);
-      if (!classToJoin) return false;
-
-      if (classToJoin.studentIds.includes(user.id)) return false;
-
-      setClasses((prev) =>
-        prev.map((c) =>
-          c.id === classToJoin.id ? { ...c, studentIds: [...c.studentIds, user.id] } : c
-        )
-      );
-      return true;
+      try {
+        const response = await fetch('/api/classes/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inviteCode, studentId: user.id }),
+        });
+        if (response.ok) {
+          // Re-fetch student classes and quizzes
+          const [classesRes, quizzesRes] = await Promise.all([
+            fetch(`/api/classes?studentId=${user.id}`),
+            fetch(`/api/quizzes?studentId=${user.id}`)
+          ]);
+          const [classesData, quizzesData] = await Promise.all([
+            classesRes.json(),
+            quizzesRes.json()
+          ]);
+          setClasses(classesData.classes);
+          setQuizzes(quizzesData.quizzes || []);
+          toast.success('Joined class successfully');
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Join class error:', error);
+        return false;
+      }
     },
-    [user, classes]
+    [user]
   );
 
-  const addQuiz = useCallback((quiz: Quiz) => {
-    setQuizzes((prev) => [...prev, quiz]);
-    setClasses((prev) =>
-      prev.map((c) =>
-        c.id === quiz.classId ? { ...c, quizIds: [...c.quizIds, quiz.id] } : c
-      )
-    );
+  const addQuiz = useCallback(async (quiz: Quiz) => {
+    try {
+      const response = await fetch('/api/quizzes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quiz),
+      });
+      if (response.ok) {
+        setQuizzes((prev) => [...prev, quiz]);
+        toast.success('Quiz created successfully');
+      }
+    } catch (error) {
+      console.error('Add quiz error:', error);
+    }
   }, []);
 
-  const updateQuiz = useCallback((quiz: Quiz) => {
-    setQuizzes((prev) => prev.map((q) => (q.id === quiz.id ? quiz : q)));
+  const updateQuiz = useCallback(async (quiz: Quiz) => {
+    try {
+      const response = await fetch(`/api/quizzes/${quiz.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quiz),
+      });
+      if (response.ok) {
+        setQuizzes((prev) => prev.map((q) => (q.id === quiz.id ? quiz : q)));
+        toast.success('Quiz updated successfully');
+      }
+    } catch (error) {
+      console.error('Update quiz error:', error);
+    }
   }, []);
 
-  const deleteQuiz = useCallback((quizId: string) => {
-    setQuizzes((prev) => prev.filter((q) => q.id !== quizId));
-    setClasses((prev) =>
-      prev.map((c) => ({
-        ...c,
-        quizIds: c.quizIds.filter((id) => id !== quizId),
-      }))
-    );
+  const deleteQuiz = useCallback(async (quizId: string) => {
+    try {
+      const response = await fetch(`/api/quizzes/${quizId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setQuizzes((prev) => prev.filter((q) => q.id !== quizId));
+        toast.success('Quiz deleted successfully');
+      }
+    } catch (error) {
+      console.error('Delete quiz error:', error);
+    }
   }, []);
 
-  const addAttempt = useCallback((attempt: QuizAttempt) => {
-    setAttempts((prev) => [...prev, attempt]);
+  const addAttempt = useCallback(async (attempt: QuizAttempt) => {
+    try {
+      const response = await fetch('/api/attempts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(attempt),
+      });
+      if (response.ok) {
+        setAttempts((prev) => [...prev, attempt]);
+        // Update local user XP as well
+        setUser(prev => prev ? { ...prev, totalXP: prev.totalXP + attempt.xpEarned } : null);
+      }
+    } catch (error) {
+      console.error('Add attempt error:', error);
+    }
   }, []);
 
   const updateUserXP = useCallback((xp: number) => {
@@ -157,14 +320,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, [user]);
 
-  const addAuditLog = useCallback((log: Omit<AuditLog, 'id' | 'timestamp'>) => {
-    const newLog: AuditLog = {
-      ...log,
-      id: `log-${Date.now()}`,
-      timestamp: new Date(),
-    };
-    setAuditLogs((prev) => [...prev, newLog]);
-  }, []);
+  const addAuditLog = useCallback(async (log: Omit<AuditLog, 'id' | 'timestamp'>) => {
+    try {
+      const response = await fetch('/api/audit-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...log, userId: user?.id }),
+      });
+      if (response.ok) {
+        // Optionally fetch and update log state if needed
+      }
+    } catch (error) {
+      console.error('Add audit log error:', error);
+    }
+  }, [user]);
 
   const getStudentAttempts = useCallback(
     (studentId: string, quizId: string): QuizAttempt[] => {
@@ -174,23 +343,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const getClassStudents = useCallback(
-    (classId: string): User[] => {
-      const classData = classes.find((c) => c.id === classId);
-      if (!classData) return [];
-      return MOCK_STUDENTS.filter((s) => classData.studentIds.includes(s.id));
+    async (classId: string): Promise<User[]> => {
+      try {
+        const response = await fetch(`/api/classes/${classId}/students`);
+        if (response.ok) {
+          const data = await response.json();
+          return data.students;
+        }
+        return [];
+      } catch (error) {
+        console.error('Get class students error:', error);
+        return [];
+      }
     },
-    [classes]
+    []
   );
 
   const getTeacherClasses = useCallback((): Class[] => {
-    if (!user || user.role !== 'teacher') return [];
-    return classes.filter((c) => c.teacherId === user.id);
+    return classes.filter((c) => c.teacherId === user?.id);
   }, [user, classes]);
 
   const getStudentClasses = useCallback((): Class[] => {
-    if (!user || user.role !== 'student') return [];
-    return classes.filter((c) => c.studentIds.includes(user.id));
-  }, [user, classes]);
+    // Note: for students, the classes state already contains only their enrolled classes 
+    // because we filter by studentId in the hydration useEffect.
+    return classes;
+  }, [classes]);
+
+  const fetchQuizAttempts = useCallback(async (quizId: string) => {
+    try {
+      const res = await fetch(`/api/attempts?quizId=${quizId}`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.attempts || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('Fetch quiz attempts error:', error);
+      return [];
+    }
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -217,6 +408,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getClassStudents,
         getTeacherClasses,
         getStudentClasses,
+        fetchQuizAttempts,
       }}
     >
       {children}
